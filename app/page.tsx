@@ -92,7 +92,7 @@ export default function Home() {
       </section>
 
       <footer>
-        <span>© 2026 · Tended with care</span>
+        <span>Planted and tended by Shayan.</span>
         <span>Made in Tehran</span>
       </footer>
     </main>
