@@ -1,32 +1,43 @@
 "use client";
 
-/* User-selected data images are intentionally rendered without optimization. */
+/* User-selected images may be local data URLs or remote uploads. */
 /* eslint-disable @next/next/no-img-element */
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { starterPosts } from "../admin/data";
 import { defaultGardenSettings, normalizeSettings, SETTINGS_EVENT, SETTINGS_KEY } from "../admin/settings";
 import type { GardenPost, GardenSettings } from "../admin/types";
 import { CONTENT_EVENT, loadGardenPosts } from "../lib/garden-content";
-import { PageIntro } from "./page-intro";
+
+const sectionCopy: Record<string, { eyebrow: string; description: string; symbol: string }> = {
+  build: { eyebrow: "Made with hands & pixels", description: "Projects that escaped the notebook and became real things.", symbol: "↗" },
+  lab: { eyebrow: "Work in public", description: "Experiments, prototypes, tests, and questions without tidy answers.", symbol: "✦" },
+  notes: { eyebrow: "Loose thoughts, kept safely", description: "Essays, observations, systems, and fragments I want to return to.", symbol: "✎" },
+  shelf: { eyebrow: "Things that feed the garden", description: "Books, films, shows, music, and ideas worth passing along.", symbol: "⌑" },
+  life: { eyebrow: "Away from the screen", description: "Biking, football, places, routines, and moments from an ordinary life.", symbol: "☼" },
+};
+
+function displayDate(value: string) {
+  if (!value) return "Recently planted";
+  return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
+}
 
 export function GardenSection({ slug }: { slug: string }) {
-  const fallbackTitle = slug
-    .split("-")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
+  const fallbackTitle = slug.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
   const [settings, setSettings] = useState<GardenSettings>(defaultGardenSettings);
-  const [posts, setPosts] = useState<GardenPost[]>([]);
+  const [posts, setPosts] = useState<GardenPost[]>(starterPosts);
 
   useEffect(() => {
     const load = async () => {
       const storedSettings = window.localStorage.getItem(SETTINGS_KEY);
       try {
-        if (storedSettings) setSettings(normalizeSettings(JSON.parse(storedSettings)));
+        setSettings(storedSettings ? normalizeSettings(JSON.parse(storedSettings)) : defaultGardenSettings);
       } catch {
         setSettings(defaultGardenSettings);
       }
-      setPosts((await loadGardenPosts()) || []);
+      const storedPosts = await loadGardenPosts();
+      setPosts(storedPosts === undefined ? starterPosts : storedPosts);
     };
     const refresh = () => void load();
     const timer = window.setTimeout(refresh, 0);
@@ -43,29 +54,56 @@ export function GardenSection({ slug }: { slug: string }) {
 
   const category = settings.categories.find((item) => item.slug === slug);
   const title = category?.label || fallbackTitle;
-  const visiblePosts = posts.filter((post) => post.status === "Published" && post.category === title);
+  const categoryDesign = category?.id.replace(/^category-/, "") || slug;
+  const design = sectionCopy[categoryDesign] ? categoryDesign : slug;
+  const copy = sectionCopy[design] || { eyebrow: "A corner of the garden", description: `Everything growing in ${title}.`, symbol: "↗" };
+  const visiblePosts = useMemo(
+    () => posts
+      .filter((post) => post.status === "Published" && post.category === title)
+      .sort((a, b) => new Date(b.publishedAt || b.updatedAt).getTime() - new Date(a.publishedAt || a.updatedAt).getTime()),
+    [posts, title],
+  );
 
   return (
-    <PageIntro eyebrow={title} title={title} description={`Everything growing in ${title}.`}>
+    <main className={`section-page theme-${design}`}>
+      <section className="section-hero">
+        <div className="section-hero-copy">
+          <p className="section-eyebrow"><span>{String(visiblePosts.length).padStart(2, "0")}</span>{copy.eyebrow}</p>
+          <h1>{title}<i aria-hidden="true">{copy.symbol}</i></h1>
+          <p>{copy.description}</p>
+        </div>
+        <div className="section-doodle" aria-hidden="true">{category?.iconImage ? <img src={category.iconImage} alt="" /> : <span>{copy.symbol}</span>}<i /></div>
+      </section>
+
       {visiblePosts.length ? (
-        <section className="category-list" aria-label={`${title} content`}>
-          {visiblePosts.map((post) => (
-            <article key={post.id}>
-              <Link className="garden-section-link" href={`/${slug}/${post.slug}`}>
-                {post.coverImage ? <img alt="" className="garden-section-cover" src={post.coverImage} /> : null}
-                <p className="eyebrow">{post.tags.length ? post.tags.map((tag) => `#${tag}`).join(" ") : "From the garden"}</p>
-                <h2>{post.title}</h2>
-                {post.description ? <p className="intro">{post.description}</p> : null}
-                <span className="garden-read-more">Open piece →</span>
-              </Link>
-            </article>
-          ))}
+        <section className="section-collection" aria-label={`${title} content`}>
+          <header><p>Latest growth</p><span>{visiblePosts.length} {visiblePosts.length === 1 ? "piece" : "pieces"} in this plot</span></header>
+          <div className="section-card-grid">
+            {visiblePosts.map((post, index) => (
+              <article className={`content-card content-card-${(index % 4) + 1}`} key={post.id}>
+                <Link href={`/${slug}/${post.slug}`}>
+                  <span className="content-card-visual">
+                    {post.coverImage ? <img alt="" src={post.coverImage} /> : <i aria-hidden="true">{String(index + 1).padStart(2, "0")}</i>}
+                    <small>{post.category}</small>
+                  </span>
+                  <span className="content-card-copy">
+                    <span className="content-meta">{displayDate(post.publishedAt || post.updatedAt)}</span>
+                    <strong>{post.title}</strong>
+                    {post.description ? <span>{post.description}</span> : null}
+                    <b>Read piece <i aria-hidden="true">↗</i></b>
+                  </span>
+                </Link>
+              </article>
+            ))}
+          </div>
         </section>
       ) : (
-        <section className="empty-state" aria-label={`${title} content`}>
-          <p className="eyebrow">This part of the garden is ready for its first piece.</p>
+        <section className="section-empty" aria-label={`${title} content`}>
+          <span aria-hidden="true">{category?.iconImage ? <img src={category.iconImage} alt="" /> : copy.symbol}</span>
+          <h2>This plot is ready.</h2>
+          <p>The first {title.toLowerCase()} piece is still taking root.</p>
         </section>
       )}
-    </PageIntro>
+    </main>
   );
 }

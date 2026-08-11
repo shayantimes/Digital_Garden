@@ -6,10 +6,13 @@ export type GardenCategory = {
   id: string;
   label: string;
   slug: string;
+  iconImage: string;
 };
 
 export type GardenSettings = {
   headerName: string;
+  profileImage: string;
+  recentCount: number;
   categories: GardenCategory[];
 };
 

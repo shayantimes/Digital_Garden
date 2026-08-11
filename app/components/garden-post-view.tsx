@@ -5,16 +5,36 @@
 
 import Link from "next/link";
 import { type ReactNode, useEffect, useState } from "react";
+import { starterPosts } from "../admin/data";
 import { defaultGardenSettings, normalizeSettings, SETTINGS_EVENT, SETTINGS_KEY } from "../admin/settings";
 import type { GardenPost, GardenSettings } from "../admin/types";
 import { CONTENT_EVENT, loadGardenPosts } from "../lib/garden-content";
+
+function safeLink(value: string) {
+  if (value.startsWith("/") && !value.startsWith("//")) return value;
+  try {
+    const url = new URL(value);
+    return ["http:", "https:", "mailto:"].includes(url.protocol) ? value : "#";
+  } catch {
+    return "#";
+  }
+}
+
+function safeMedia(value: string) {
+  if (value.startsWith("/") && !value.startsWith("//")) return value;
+  try {
+    return new URL(value).protocol === "https:" ? value : "";
+  } catch {
+    return "";
+  }
+}
 
 function inlineMarkdown(text: string): ReactNode[] {
   return text.split(/(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)]+\))/g).map((token, index) => {
     if (token.startsWith("**") && token.endsWith("**")) return <strong key={index}>{token.slice(2, -2)}</strong>;
     if (token.startsWith("`") && token.endsWith("`")) return <code key={index}>{token.slice(1, -1)}</code>;
     const link = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-    if (link) return <a href={link[2]} key={index} rel="noreferrer" target="_blank">{link[1]}</a>;
+    if (link) return <a href={safeLink(link[2])} key={index} rel="noreferrer" target="_blank">{link[1]}</a>;
     return token;
   });
 }
@@ -23,6 +43,11 @@ function MarkdownContent({ content }: { content: string }) {
   return (
     <div className="garden-markdown">
       {content.split("\n").map((line, index) => {
+        const image = line.match(/^!\[([^\]]*)\]\(([^)]+)\)$/);
+        if (image) {
+          const source = safeMedia(image[2]);
+          return source ? <img alt={image[1]} className="garden-inline-image" key={index} src={source} /> : null;
+        }
         if (line.startsWith("### ")) return <h3 key={index}>{inlineMarkdown(line.slice(4))}</h3>;
         if (line.startsWith("## ")) return <h2 key={index}>{inlineMarkdown(line.slice(3))}</h2>;
         if (line.startsWith("# ")) return <h2 key={index}>{inlineMarkdown(line.slice(2))}</h2>;
@@ -70,7 +95,8 @@ export function GardenPostView({ sectionSlug, postSlug }: { sectionSlug: string;
       }
       setSettings(nextSettings);
       const category = nextSettings.categories.find((item) => item.slug === sectionSlug);
-      const posts = (await loadGardenPosts()) || [];
+      const storedPosts = await loadGardenPosts();
+      const posts = storedPosts === undefined ? starterPosts : storedPosts;
       setPost(posts.find((item) => item.status === "Published" && item.slug === postSlug && (!category || item.category === category.label)) || null);
     };
     const refresh = () => void load();
@@ -88,10 +114,10 @@ export function GardenPostView({ sectionSlug, postSlug }: { sectionSlug: string;
 
   const category = settings.categories.find((item) => item.slug === sectionSlug);
 
-  if (post === undefined) return <main className="garden-post-page"><p className="eyebrow">Opening the garden…</p></main>;
+  if (post === undefined) return <main className={`garden-post-page theme-${sectionSlug}`}><p className="eyebrow">Opening the garden…</p></main>;
   if (post === null) {
     return (
-      <main className="garden-post-page garden-post-missing">
+      <main className={`garden-post-page garden-post-missing theme-${sectionSlug}`}>
         <p className="eyebrow">Not found</p>
         <h1>This piece isn’t published.</h1>
         <Link className="text-link" href={`/${sectionSlug}`}>Back to {category?.label || "the garden"} →</Link>
@@ -101,8 +127,9 @@ export function GardenPostView({ sectionSlug, postSlug }: { sectionSlug: string;
 
   const embedUrl = post.videoUrl ? videoEmbed(post.videoUrl) : "";
   return (
-    <main className="garden-post-page">
+    <main className={`garden-post-page theme-${sectionSlug}`}>
       <article>
+        <Link className="post-back-link" href={`/${sectionSlug}`}>← Back to {category?.label || post.category}</Link>
         <header className="garden-post-hero">
           <p className="eyebrow">{post.category} · {displayDate(post.publishedAt || post.updatedAt)}</p>
           <h1>{post.title}</h1>
@@ -120,7 +147,7 @@ export function GardenPostView({ sectionSlug, postSlug }: { sectionSlug: string;
           )
         ) : null}
 
-        {post.externalUrl ? <a className="garden-link-card" href={post.externalUrl} rel="noreferrer" target="_blank">Visit featured link <span>↗</span></a> : null}
+        {post.externalUrl ? <a className="garden-link-card" href={safeLink(post.externalUrl)} rel="noreferrer" target="_blank">Visit featured link <span>↗</span></a> : null}
         {post.content ? <MarkdownContent content={post.content} /> : null}
 
         {post.gallery?.length ? (
@@ -130,6 +157,7 @@ export function GardenPostView({ sectionSlug, postSlug }: { sectionSlug: string;
         ) : null}
 
         <footer className="garden-post-footer">
+          <span>Keep wandering through the garden.</span>
           <Link href={`/${sectionSlug}`}>← Back to {category?.label || post.category}</Link>
         </footer>
       </article>
