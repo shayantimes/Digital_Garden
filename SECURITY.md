@@ -10,6 +10,6 @@ Do not open a public issue. Use GitHub’s **Private vulnerability reporting** f
 
 ## Secrets
 
-Secrets belong only in the deployment provider’s encrypted environment settings. Never place OAuth client secrets, session secrets, or GitHub tokens in commits, issues, screenshots, logs, or browser-side variables.
+Secrets belong only in the deployment provider’s encrypted environment settings. Never place tokens or private credentials in commits, issues, screenshots, logs, or browser-side variables.
 
 If a secret is exposed, revoke it at the provider immediately, create a replacement, update the deployment environment, and redeploy.

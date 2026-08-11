@@ -5,15 +5,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
-import { starterPosts } from "../admin/data";
-import {
-  defaultGardenSettings,
-  normalizeSettings,
-  SETTINGS_EVENT,
-  SETTINGS_KEY,
-} from "../admin/settings";
-import type { GardenCategory, GardenPost, GardenSettings } from "../admin/types";
-import { CONTENT_EVENT, loadGardenPosts } from "../lib/garden-content";
+import { gardenSettings } from "../lib/garden-config";
+import { starterPosts } from "../lib/garden-data";
+import type { GardenCategory, GardenPost } from "../lib/garden-types";
 import styles from "./garden-home-content.module.css";
 import { PlantIcon } from "./plant-icon";
 
@@ -85,36 +79,12 @@ function PaperPanel({
 }
 
 export function GardenHomeContent() {
-  const [posts, setPosts] = useState<GardenPost[]>(starterPosts.filter((post) => post.status === "Published"));
-  const [settings, setSettings] = useState<GardenSettings>(defaultGardenSettings);
+  const posts = useMemo(() => starterPosts
+    .filter((post) => post.status === "Published")
+    .sort((a, b) => new Date(b.publishedAt || b.updatedAt).getTime() - new Date(a.publishedAt || a.updatedAt).getTime()), []);
+  const settings = gardenSettings;
   const [gardenScale, setGardenScale] = useState(1);
   const desktopRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const load = async () => {
-      const storedSettings = window.localStorage.getItem(SETTINGS_KEY);
-      try {
-        setSettings(storedSettings ? normalizeSettings(JSON.parse(storedSettings)) : defaultGardenSettings);
-      } catch {
-        setSettings(defaultGardenSettings);
-      }
-      const storedPosts = await loadGardenPosts();
-      setPosts((storedPosts === undefined ? starterPosts : storedPosts)
-        .filter((post) => post.status === "Published")
-        .sort((a, b) => new Date(b.publishedAt || b.updatedAt).getTime() - new Date(a.publishedAt || a.updatedAt).getTime()));
-    };
-    const refresh = () => void load();
-    const timer = window.setTimeout(refresh, 0);
-    window.addEventListener(CONTENT_EVENT, refresh);
-    window.addEventListener(SETTINGS_EVENT, refresh);
-    window.addEventListener("storage", refresh);
-    return () => {
-      window.clearTimeout(timer);
-      window.removeEventListener(CONTENT_EVENT, refresh);
-      window.removeEventListener(SETTINGS_EVENT, refresh);
-      window.removeEventListener("storage", refresh);
-    };
-  }, []);
 
   useEffect(() => {
     const desktop = desktopRef.current;
@@ -140,7 +110,7 @@ export function GardenHomeContent() {
       section,
       settings.categories.find((category) => category.id === `category-${section}`)
         || settings.categories[index]
-        || defaultGardenSettings.categories[index],
+        || gardenSettings.categories[index],
     ])) as Record<GardenSection, GardenCategory>;
   }, [settings.categories]);
 

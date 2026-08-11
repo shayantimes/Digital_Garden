@@ -45,11 +45,3 @@ export type GardenPost = {
   comments: number;
   versions: PostVersion[];
 };
-
-export type ActivityItem = {
-  id: string;
-  action: string;
-  detail: string;
-  time: string;
-  kind: "publish" | "edit" | "comment" | "subscriber";
-};

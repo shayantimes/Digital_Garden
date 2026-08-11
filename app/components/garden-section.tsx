@@ -1,14 +1,9 @@
-"use client";
-
-/* User-selected images may be local data URLs or remote uploads. */
+/* Static category images may be local or remote assets. */
 /* eslint-disable @next/next/no-img-element */
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { starterPosts } from "../admin/data";
-import { defaultGardenSettings, normalizeSettings, SETTINGS_EVENT, SETTINGS_KEY } from "../admin/settings";
-import type { GardenPost, GardenSettings } from "../admin/types";
-import { CONTENT_EVENT, loadGardenPosts } from "../lib/garden-content";
+import { gardenSettings } from "../lib/garden-config";
+import { starterPosts } from "../lib/garden-data";
 
 const sectionCopy: Record<string, { eyebrow: string; description: string; symbol: string }> = {
   build: { eyebrow: "Made with hands & pixels", description: "Projects that escaped the notebook and became real things.", symbol: "↗" },
@@ -25,44 +20,16 @@ function displayDate(value: string) {
 
 export function GardenSection({ slug }: { slug: string }) {
   const fallbackTitle = slug.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
-  const [settings, setSettings] = useState<GardenSettings>(defaultGardenSettings);
-  const [posts, setPosts] = useState<GardenPost[]>(starterPosts);
-
-  useEffect(() => {
-    const load = async () => {
-      const storedSettings = window.localStorage.getItem(SETTINGS_KEY);
-      try {
-        setSettings(storedSettings ? normalizeSettings(JSON.parse(storedSettings)) : defaultGardenSettings);
-      } catch {
-        setSettings(defaultGardenSettings);
-      }
-      const storedPosts = await loadGardenPosts();
-      setPosts(storedPosts === undefined ? starterPosts : storedPosts);
-    };
-    const refresh = () => void load();
-    const timer = window.setTimeout(refresh, 0);
-    window.addEventListener(SETTINGS_EVENT, refresh);
-    window.addEventListener(CONTENT_EVENT, refresh);
-    window.addEventListener("storage", refresh);
-    return () => {
-      window.clearTimeout(timer);
-      window.removeEventListener(SETTINGS_EVENT, refresh);
-      window.removeEventListener(CONTENT_EVENT, refresh);
-      window.removeEventListener("storage", refresh);
-    };
-  }, []);
+  const settings = gardenSettings;
 
   const category = settings.categories.find((item) => item.slug === slug);
   const title = category?.label || fallbackTitle;
   const categoryDesign = category?.id.replace(/^category-/, "") || slug;
   const design = sectionCopy[categoryDesign] ? categoryDesign : slug;
   const copy = sectionCopy[design] || { eyebrow: "A corner of the garden", description: `Everything growing in ${title}.`, symbol: "↗" };
-  const visiblePosts = useMemo(
-    () => posts
+  const visiblePosts = starterPosts
       .filter((post) => post.status === "Published" && post.category === title)
-      .sort((a, b) => new Date(b.publishedAt || b.updatedAt).getTime() - new Date(a.publishedAt || a.updatedAt).getTime()),
-    [posts, title],
-  );
+      .sort((a, b) => new Date(b.publishedAt || b.updatedAt).getTime() - new Date(a.publishedAt || a.updatedAt).getTime());
 
   return (
     <main className={`section-page theme-${design}`}>

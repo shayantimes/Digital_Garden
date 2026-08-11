@@ -1,4 +1,4 @@
-import type { ActivityItem, GardenPost } from "./types";
+import type { GardenPost } from "./garden-types";
 
 export const starterPosts: GardenPost[] = [
   {
@@ -120,36 +120,5 @@ export const starterPosts: GardenPost[] = [
     bookmarks: 25,
     comments: 4,
     versions: [{ id: "v-5-1", label: "Published version", date: "Jul 20, 2026 · 4:10 PM" }],
-  },
-];
-
-export const starterActivity: ActivityItem[] = [
-  {
-    id: "activity-1",
-    action: "Published",
-    detail: "A quiet system for capturing ideas",
-    time: "2 hours ago",
-    kind: "publish",
-  },
-  {
-    id: "activity-2",
-    action: "New comment",
-    detail: "Mina replied to Little weather station",
-    time: "5 hours ago",
-    kind: "comment",
-  },
-  {
-    id: "activity-3",
-    action: "Draft updated",
-    detail: "Field notes from a week without feeds",
-    time: "Yesterday",
-    kind: "edit",
-  },
-  {
-    id: "activity-4",
-    action: "New subscriber",
-    detail: "Your garden now has 284 readers",
-    time: "Yesterday",
-    kind: "subscriber",
   },
 ];

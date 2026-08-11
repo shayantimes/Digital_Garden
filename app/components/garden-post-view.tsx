@@ -1,14 +1,10 @@
-"use client";
-
-/* User-selected data/blob images are intentionally rendered without optimization. */
+/* Static post images are intentionally rendered without optimization. */
 /* eslint-disable @next/next/no-img-element */
 
 import Link from "next/link";
-import { type ReactNode, useEffect, useState } from "react";
-import { starterPosts } from "../admin/data";
-import { defaultGardenSettings, normalizeSettings, SETTINGS_EVENT, SETTINGS_KEY } from "../admin/settings";
-import type { GardenPost, GardenSettings } from "../admin/types";
-import { CONTENT_EVENT, loadGardenPosts } from "../lib/garden-content";
+import { type ReactNode } from "react";
+import { gardenSettings } from "../lib/garden-config";
+import { starterPosts } from "../lib/garden-data";
 
 function safeLink(value: string) {
   if (value.startsWith("/") && !value.startsWith("//")) return value;
@@ -81,40 +77,8 @@ function displayDate(value: string) {
 }
 
 export function GardenPostView({ sectionSlug, postSlug }: { sectionSlug: string; postSlug: string }) {
-  const [post, setPost] = useState<GardenPost | null | undefined>(undefined);
-  const [settings, setSettings] = useState<GardenSettings>(defaultGardenSettings);
-
-  useEffect(() => {
-    const load = async () => {
-      const storedSettings = window.localStorage.getItem(SETTINGS_KEY);
-      let nextSettings = defaultGardenSettings;
-      try {
-        if (storedSettings) nextSettings = normalizeSettings(JSON.parse(storedSettings));
-      } catch {
-        nextSettings = defaultGardenSettings;
-      }
-      setSettings(nextSettings);
-      const category = nextSettings.categories.find((item) => item.slug === sectionSlug);
-      const storedPosts = await loadGardenPosts();
-      const posts = storedPosts === undefined ? starterPosts : storedPosts;
-      setPost(posts.find((item) => item.status === "Published" && item.slug === postSlug && (!category || item.category === category.label)) || null);
-    };
-    const refresh = () => void load();
-    const timer = window.setTimeout(refresh, 0);
-    window.addEventListener(CONTENT_EVENT, refresh);
-    window.addEventListener(SETTINGS_EVENT, refresh);
-    window.addEventListener("storage", refresh);
-    return () => {
-      window.clearTimeout(timer);
-      window.removeEventListener(CONTENT_EVENT, refresh);
-      window.removeEventListener(SETTINGS_EVENT, refresh);
-      window.removeEventListener("storage", refresh);
-    };
-  }, [postSlug, sectionSlug]);
-
-  const category = settings.categories.find((item) => item.slug === sectionSlug);
-
-  if (post === undefined) return <main className={`garden-post-page theme-${sectionSlug}`}><p className="eyebrow">Opening the garden…</p></main>;
+  const category = gardenSettings.categories.find((item) => item.slug === sectionSlug);
+  const post = starterPosts.find((item) => item.status === "Published" && item.slug === postSlug && (!category || item.category === category.label)) || null;
   if (post === null) {
     return (
       <main className={`garden-post-page garden-post-missing theme-${sectionSlug}`}>
