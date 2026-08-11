@@ -16,67 +16,44 @@ export function SiteHeader() {
   const [settings, setSettings] = useState<GardenSettings>(defaultGardenSettings);
 
   useEffect(() => {
-    const timer = window.setTimeout(() => {
+    const refresh = () => {
       const stored = window.localStorage.getItem(SETTINGS_KEY);
-      if (stored) {
-        try {
-          setSettings(normalizeSettings(JSON.parse(stored)));
-        } catch {
-          window.localStorage.removeItem(SETTINGS_KEY);
-        }
-      }
-    }, 0);
-    const onSettingsChange = (event: Event) => {
-      if (event instanceof CustomEvent) setSettings(normalizeSettings(event.detail));
-    };
-    const onStorage = (event: StorageEvent) => {
-      if (event.key === SETTINGS_KEY && event.newValue) {
-        try {
-          setSettings(normalizeSettings(JSON.parse(event.newValue)));
-        } catch {
-          return;
-        }
+      try {
+        setSettings(stored ? normalizeSettings(JSON.parse(stored)) : defaultGardenSettings);
+      } catch {
+        setSettings(defaultGardenSettings);
       }
     };
-    window.addEventListener(SETTINGS_EVENT, onSettingsChange);
-    window.addEventListener("storage", onStorage);
+    const timer = window.setTimeout(refresh, 0);
+    window.addEventListener(SETTINGS_EVENT, refresh);
+    window.addEventListener("storage", refresh);
     return () => {
       window.clearTimeout(timer);
-      window.removeEventListener(SETTINGS_EVENT, onSettingsChange);
-      window.removeEventListener("storage", onStorage);
+      window.removeEventListener(SETTINGS_EVENT, refresh);
+      window.removeEventListener("storage", refresh);
     };
   }, []);
 
-  const navigation = [
-    { href: "/", label: settings.headerName },
-    ...settings.categories.map((category) => ({ href: `/${category.slug}`, label: category.label })),
-  ];
-
-  if (pathname.startsWith("/admin")) {
-    return null;
-  }
+  if (pathname === "/" || pathname.startsWith("/admin")) return null;
 
   return (
-    <header className="site-nav">
-      <nav className="nav-links" aria-label="Main navigation">
-        {navigation.map((item) => (
-          <Link
-            aria-current={pathname === item.href ? "page" : undefined}
-            className={pathname === item.href ? "nav-active" : undefined}
-            href={item.href}
-            key={item.href}
-          >
-            {item.label}
-          </Link>
-        ))}
-      </nav>
-      <nav className="social-links" aria-label="Elsewhere">
-        <a href="#cv">CV</a>
-        <a href="#github">GitHub</a>
-        <a href="#twitter">Twitter</a>
-        <a href="#instagram">Instagram</a>
-        <a href="#linkedin">LinkedIn</a>
-      </nav>
+    <header className="site-header">
+      <div className="header-inner">
+        <Link className="garden-title-link" href="/" aria-label={`${settings.headerName}'s garden, home`}>
+          {settings.headerName}&apos;s Garden
+        </Link>
+        <nav className="header-section-menu" aria-label="Garden sections">
+          {settings.categories.map((category) => {
+            const href = `/${category.slug}`;
+            const active = pathname === href || pathname.startsWith(`${href}/`);
+            return (
+              <Link className={active ? "header-section-active" : ""} href={href} key={category.id} aria-current={active ? "page" : undefined}>
+                {category.label}
+              </Link>
+            );
+          })}
+        </nav>
+      </div>
     </header>
   );
 }

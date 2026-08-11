@@ -6,12 +6,14 @@ export const SETTINGS_EVENT = "garden-settings-change";
 
 export const defaultGardenSettings: GardenSettings = {
   headerName: "Shayan",
+  profileImage: "",
+  recentCount: 10,
   categories: [
-    { id: "category-build", label: "Build", slug: "build" },
-    { id: "category-lab", label: "Lab", slug: "lab" },
-    { id: "category-notes", label: "Notes", slug: "notes" },
-    { id: "category-shelf", label: "Shelf", slug: "shelf" },
-    { id: "category-life", label: "Life", slug: "life" },
+    { id: "category-build", label: "Build", slug: "build", iconImage: "" },
+    { id: "category-lab", label: "Lab", slug: "lab", iconImage: "" },
+    { id: "category-notes", label: "Notes", slug: "notes", iconImage: "" },
+    { id: "category-shelf", label: "Shelf", slug: "shelf", iconImage: "" },
+    { id: "category-life", label: "Life", slug: "life", iconImage: "" },
   ],
 };
 
@@ -34,12 +36,17 @@ export function normalizeSettings(value: unknown): GardenSettings {
           id: category.id || `category-${index}-${slugifySetting(category.label)}`,
           label: category.label.trim() || `Section ${index + 1}`,
           slug: slugifySetting(category.slug || category.label) || `section-${index + 1}`,
+          iconImage: typeof category.iconImage === "string" ? category.iconImage : "",
         }))
     : defaultGardenSettings.categories;
   return {
     headerName: typeof candidate.headerName === "string" && candidate.headerName.trim()
       ? candidate.headerName.trim()
       : defaultGardenSettings.headerName,
+    profileImage: typeof candidate.profileImage === "string" ? candidate.profileImage : "",
+    recentCount: typeof candidate.recentCount === "number" && Number.isFinite(candidate.recentCount)
+      ? Math.min(30, Math.max(1, Math.round(candidate.recentCount)))
+      : defaultGardenSettings.recentCount,
     categories: categories.length ? categories : defaultGardenSettings.categories,
   };
 }

@@ -8,96 +8,107 @@ const POSTS_RECORD = "posts";
 
 export const CONTENT_EVENT = "garden-content-change";
 
-function openDatabase(): Promise<IDBDatabase> {
+type ContentResponse = {
+  posts?: GardenPost[];
+  source?: "github" | "local";
+  backend?: "github" | "local";
+  error?: string;
+};
+
+export async function fetchGardenPosts() {
+  const response = await fetch("/api/content", { cache: "no-store" });
+  const result = (await response.json()) as ContentResponse;
+  if (!response.ok) throw new Error(result.error || "Your garden could not be loaded.");
+  return {
+    posts: (result.posts || []).map(normalizePost),
+    source: result.source || "local",
+    backend: result.backend || "local",
+  };
+}
+
+// Compatibility for the existing public frontend while content moves from
+// browser storage to the authenticated server-backed repository.
+export async function loadGardenPosts(): Promise<GardenPost[] | undefined> {
+  try {
+    return (await fetchGardenPosts()).posts;
+  } catch {
+    return [];
+  }
+}
+
+async function parseMutationResponse(response: Response, fallback: string) {
+  const result = (await response.json()) as { source?: "github" | "local"; error?: string };
+  if (!response.ok) throw new Error(result.error || fallback);
+  window.dispatchEvent(new CustomEvent(CONTENT_EVENT));
+  return result.source || "local";
+}
+
+export async function saveGardenPost(post: GardenPost) {
+  const response = await fetch("/api/content", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ post: normalizePost(post) }),
+  });
+  return parseMutationResponse(response, "Your changes could not be published.");
+}
+
+export async function importGardenPosts(posts: GardenPost[]) {
+  const response = await fetch("/api/content/import", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ posts: posts.map(normalizePost) }),
+  });
+  return parseMutationResponse(response, "Those notes could not be imported.");
+}
+
+export async function removeGardenPost(id: string) {
+  const response = await fetch("/api/content", {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id }),
+  });
+  return parseMutationResponse(response, "That note could not be removed.");
+}
+
+function openLegacyDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = window.indexedDB.open(DATABASE_NAME, DATABASE_VERSION);
     request.onupgradeneeded = () => {
-      if (!request.result.objectStoreNames.contains(STORE_NAME)) {
-        request.result.createObjectStore(STORE_NAME);
-      }
+      if (!request.result.objectStoreNames.contains(STORE_NAME)) request.result.createObjectStore(STORE_NAME);
     };
     request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error || new Error("Could not open the content database."));
+    request.onerror = () => reject(request.error || new Error("Could not open the old content store."));
   });
 }
 
-function getStoredPosts(database: IDBDatabase): Promise<GardenPost[] | undefined> {
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction(STORE_NAME, "readonly");
-    const request = transaction.objectStore(STORE_NAME).get(POSTS_RECORD);
-    request.onsuccess = () => {
-      const value = request.result;
-      resolve(Array.isArray(value) ? (value as GardenPost[]).map(normalizePost) : undefined);
-    };
-    request.onerror = () => reject(request.error || new Error("Could not read saved content."));
-  });
-}
-
-function putStoredPosts(database: IDBDatabase, posts: GardenPost[]): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const transaction = database.transaction(STORE_NAME, "readwrite");
-    transaction.objectStore(STORE_NAME).put(posts, POSTS_RECORD);
-    transaction.oncomplete = () => resolve();
-    transaction.onerror = () => reject(transaction.error || new Error("Could not save content."));
-    transaction.onabort = () => reject(transaction.error || new Error("Saving content was interrupted."));
-  });
-}
-
-function loadLegacyPosts(): GardenPost[] | undefined {
-  const legacy = window.localStorage.getItem(POSTS_KEY);
-  if (!legacy) return undefined;
+export async function loadLegacyGardenPosts(): Promise<GardenPost[]> {
+  if (typeof window === "undefined") return [];
   try {
-    const parsed = JSON.parse(legacy);
-    return Array.isArray(parsed) ? (parsed as GardenPost[]).map(normalizePost) : undefined;
-  } catch {
-    window.localStorage.removeItem(POSTS_KEY);
-    return undefined;
-  }
-}
-
-function saveLightweightFallback(posts: GardenPost[]) {
-  const withoutLargeImages = posts.map((post) => ({
-    ...post,
-    coverImage: "",
-    gallery: [],
-  }));
-  try {
-    window.localStorage.setItem(POSTS_KEY, JSON.stringify(withoutLargeImages));
-  } catch {
-    // IndexedDB remains the source of truth if the small compatibility copy cannot be written.
-  }
-}
-
-export async function loadGardenPosts(): Promise<GardenPost[] | undefined> {
-  if (typeof window === "undefined") return undefined;
-  try {
-    const database = await openDatabase();
-    const stored = await getStoredPosts(database);
+    const database = await openLegacyDatabase();
+    const posts = await new Promise<GardenPost[]>((resolve, reject) => {
+      const request = database.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).get(POSTS_RECORD);
+      request.onsuccess = () => resolve(Array.isArray(request.result) ? request.result.map(normalizePost) : []);
+      request.onerror = () => reject(request.error);
+    });
     database.close();
-    if (stored !== undefined) return stored;
+    if (posts.length) return posts;
   } catch {
-    // Older/private browsers can still use the compatibility copy below.
+    // The localStorage fallback below may still contain the old studio data.
   }
-
-  const legacy = loadLegacyPosts();
-  if (legacy !== undefined) {
-    try {
-      await saveGardenPosts(legacy, false);
-    } catch {
-      // The legacy content is still usable for this session.
-    }
+  try {
+    const stored = window.localStorage.getItem(POSTS_KEY);
+    const parsed = stored ? JSON.parse(stored) : [];
+    return Array.isArray(parsed) ? parsed.map(normalizePost) : [];
+  } catch {
+    return [];
   }
-  return legacy;
 }
 
-export async function saveGardenPosts(posts: GardenPost[], announce = true): Promise<void> {
-  if (typeof window === "undefined") return;
-  const database = await openDatabase();
-  try {
-    await putStoredPosts(database, posts.map(normalizePost));
-  } finally {
-    database.close();
-  }
-  saveLightweightFallback(posts);
-  if (announce) window.dispatchEvent(new CustomEvent(CONTENT_EVENT));
+export async function uploadGardenImage(file: File) {
+  const form = new FormData();
+  form.append("file", file);
+  const response = await fetch("/api/media", { method: "POST", body: form });
+  const result = (await response.json()) as { url?: string; error?: string };
+  if (!response.ok || !result.url) throw new Error(result.error || "That image could not be uploaded.");
+  return result.url;
 }

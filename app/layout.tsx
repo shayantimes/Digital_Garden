@@ -1,21 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { SiteHeader } from "./components/site-header";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import { SiteFooter } from "./components/site-footer";
 
 export const metadata: Metadata = {
-  title: "Digital Garden",
-  description: "A home for ideas that are still growing.",
+  title: "Shayan's Digital Garden",
+  description: "Notes, experiments, projects, and small things worth keeping.",
 };
 
 export default function RootLayout({
@@ -24,11 +14,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col"><SiteHeader />{children}</body>
+    <html lang="en" className="h-full antialiased">
+      <body className="min-h-full flex flex-col" id="top">
+        <SiteHeader />
+        {children}
+        <SiteFooter />
+      </body>
     </html>
   );
 }
