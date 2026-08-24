@@ -6,6 +6,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { gardenSettings } from "../lib/garden-config";
+import { CONTENT_EVENT, fetchGardenPosts } from "../lib/garden-content";
 import { starterPosts } from "../lib/garden-data";
 import type { GardenCategory, GardenPost } from "../lib/garden-types";
 import styles from "./garden-home-content.module.css";
@@ -79,12 +80,28 @@ function PaperPanel({
 }
 
 export function GardenHomeContent() {
-  const posts = useMemo(() => starterPosts
+  const [posts, setPosts] = useState(() => starterPosts
     .filter((post) => post.status === "Published")
-    .sort((a, b) => new Date(b.publishedAt || b.updatedAt).getTime() - new Date(a.publishedAt || a.updatedAt).getTime()), []);
+    .sort((a, b) => new Date(b.publishedAt || b.updatedAt).getTime() - new Date(a.publishedAt || a.updatedAt).getTime()));
   const settings = gardenSettings;
   const [gardenScale, setGardenScale] = useState(1);
   const desktopRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const managed = (await fetchGardenPosts()).posts
+          .filter((post) => post.status === "Published")
+          .sort((a, b) => new Date(b.publishedAt || b.updatedAt).getTime() - new Date(a.publishedAt || a.updatedAt).getTime());
+        setPosts(managed);
+      } catch {
+        // Keep the bundled garden visible if the content API is temporarily unavailable.
+      }
+    };
+    void load();
+    window.addEventListener(CONTENT_EVENT, load);
+    return () => window.removeEventListener(CONTENT_EVENT, load);
+  }, []);
 
   useEffect(() => {
     const desktop = desktopRef.current;
