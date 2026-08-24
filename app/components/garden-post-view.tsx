@@ -5,6 +5,7 @@ import Link from "next/link";
 import { type ReactNode } from "react";
 import { gardenSettings } from "../lib/garden-config";
 import { starterPosts } from "../lib/garden-data";
+import { readGardenPosts } from "../lib/server-content";
 
 function safeLink(value: string) {
   if (value.startsWith("/") && !value.startsWith("//")) return value;
@@ -76,9 +77,10 @@ function displayDate(value: string) {
   return new Intl.DateTimeFormat("en", { month: "long", day: "numeric", year: "numeric" }).format(new Date(value));
 }
 
-export function GardenPostView({ sectionSlug, postSlug }: { sectionSlug: string; postSlug: string }) {
+export async function GardenPostView({ sectionSlug, postSlug }: { sectionSlug: string; postSlug: string }) {
   const category = gardenSettings.categories.find((item) => item.slug === sectionSlug);
-  const post = starterPosts.find((item) => item.status === "Published" && item.slug === postSlug && (!category || item.category === category.label)) || null;
+  const managedPosts = await readGardenPosts({ live: false }).then((result) => result.posts).catch(() => starterPosts);
+  const post = managedPosts.find((item) => item.status === "Published" && item.slug === postSlug && (!category || item.category === category.label)) || null;
   if (post === null) {
     return (
       <main className={`garden-post-page garden-post-missing theme-${sectionSlug}`}>

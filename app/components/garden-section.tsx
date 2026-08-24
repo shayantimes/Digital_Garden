@@ -4,6 +4,7 @@
 import Link from "next/link";
 import { gardenSettings } from "../lib/garden-config";
 import { starterPosts } from "../lib/garden-data";
+import { readGardenPosts } from "../lib/server-content";
 
 const sectionCopy: Record<string, { eyebrow: string; description: string; symbol: string }> = {
   build: { eyebrow: "Made with hands & pixels", description: "Projects that escaped the notebook and became real things.", symbol: "↗" },
@@ -18,7 +19,7 @@ function displayDate(value: string) {
   return new Intl.DateTimeFormat("en", { month: "short", day: "numeric", year: "numeric" }).format(new Date(value));
 }
 
-export function GardenSection({ slug }: { slug: string }) {
+export async function GardenSection({ slug }: { slug: string }) {
   const fallbackTitle = slug.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
   const settings = gardenSettings;
 
@@ -27,7 +28,8 @@ export function GardenSection({ slug }: { slug: string }) {
   const categoryDesign = category?.id.replace(/^category-/, "") || slug;
   const design = sectionCopy[categoryDesign] ? categoryDesign : slug;
   const copy = sectionCopy[design] || { eyebrow: "A corner of the garden", description: `Everything growing in ${title}.`, symbol: "↗" };
-  const visiblePosts = starterPosts
+  const managedPosts = await readGardenPosts({ live: false }).then((result) => result.posts).catch(() => starterPosts);
+  const visiblePosts = managedPosts
       .filter((post) => post.status === "Published" && post.category === title)
       .sort((a, b) => new Date(b.publishedAt || b.updatedAt).getTime() - new Date(a.publishedAt || a.updatedAt).getTime());
 

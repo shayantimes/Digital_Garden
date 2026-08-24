@@ -1,8 +1,6 @@
 # Shayan’s Digital Garden
 
-A static personal garden built with Next.js. The main branch contains the public visual experience only: the taped-paper homepage, category pages, article pages, hover navigation, and responsive presentation.
-
-The CMS and protected admin studio are intentionally maintained on the separate `agent/cms` branch.
+A public personal garden with a private, single-owner writing studio. The taped-paper public website remains available to everyone; `/admin` is protected by a username-or-email and password login.
 
 ## Local development
 
@@ -13,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000).
+Copy `.env.example` to `.env.local`, configure the private Supabase owner account, then open [http://localhost:3000](http://localhost:3000) or [http://localhost:3000/admin](http://localhost:3000/admin).
 
 ## Verification
 
@@ -21,6 +19,6 @@ Open [http://localhost:3000](http://localhost:3000).
 npm run check
 ```
 
-Public content and garden configuration live in `app/lib/garden-data.ts` and `app/lib/garden-config.ts`.
+See [authentication setup](docs/AUTHENTICATION.md) and [production deployment](docs/DEPLOYMENT.md). Content is stored as one Markdown file per note under `content/posts/`.
 
 Tended with care in Shiraz.
