@@ -26,6 +26,8 @@ export const gardenPostSchema = z.object({
   gallery: z.array(optionalAssetUrl).max(40).default([]),
   videoUrl: optionalExternalUrl.default(""),
   externalUrl: optionalExternalUrl.default(""),
+  shelfCategory: z.enum(["Books", "Movies", "Shows", "Music", "Games"]).optional(),
+  shelfStatus: z.enum(["", "Read", "Reading", "To Read", "Watched", "Watching", "Watchlist", "Played", "Playing", "To Play"]).optional(),
   seoTitle: z.string().trim().max(180).default(""),
   seoDescription: z.string().trim().max(600).default(""),
   updatedAt: z.iso.datetime(),

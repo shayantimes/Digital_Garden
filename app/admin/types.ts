@@ -1,3 +1,5 @@
+import type { ShelfCategory, ShelfStatus } from "../lib/shelf";
+
 export type PostStatus = "Published" | "Draft" | "Scheduled";
 
 export type ContentType = "Content";
@@ -36,6 +38,8 @@ export type GardenPost = {
   gallery?: string[];
   videoUrl?: string;
   externalUrl?: string;
+  shelfCategory?: ShelfCategory;
+  shelfStatus?: ShelfStatus;
   seoTitle: string;
   seoDescription: string;
   updatedAt: string;

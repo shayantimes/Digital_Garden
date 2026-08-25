@@ -1,5 +1,5 @@
-import { GardenSection } from "../components/garden-section";
+import { ShelfSection } from "../components/shelf-section";
 
 export default function ShelfPage() {
-  return <GardenSection slug="shelf" />;
+  return <ShelfSection />;
 }

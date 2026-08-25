@@ -26,6 +26,7 @@ import {
   saveGardenPost,
   uploadGardenImage,
 } from "../lib/garden-content";
+import { normalizeShelfCategory, normalizeShelfStatus, shelfCategories, shelfStatuses } from "../lib/shelf";
 import styles from "./admin.module.css";
 
 type Filter = "All" | "Draft" | "Published";
@@ -63,6 +64,8 @@ function emptyPost(seed = ""): GardenPost {
     gallery: [],
     videoUrl: "",
     externalUrl: "",
+    shelfCategory: "Books",
+    shelfStatus: "To Read",
     seoTitle: title,
     seoDescription: "",
     updatedAt: now,
@@ -439,6 +442,30 @@ function PostEditor({
     setPost((current) => ({ ...current, [field]: value }));
   };
 
+  const updateCategory = (category: string) => {
+    setSaveState("quiet");
+    setPost((current) => {
+      if (category !== "Shelf") return { ...current, category };
+      const shelfCategory = normalizeShelfCategory(current.shelfCategory);
+      return {
+        ...current,
+        category,
+        shelfCategory,
+        shelfStatus: normalizeShelfStatus(shelfCategory, current.shelfStatus),
+      };
+    });
+  };
+
+  const updateShelfCategory = (value: string) => {
+    const shelfCategory = normalizeShelfCategory(value);
+    setSaveState("quiet");
+    setPost((current) => ({
+      ...current,
+      shelfCategory,
+      shelfStatus: normalizeShelfStatus(shelfCategory, current.shelfStatus),
+    }));
+  };
+
   const updateTitle = (title: string) => {
     setSaveState("quiet");
     setPost((current) => ({
@@ -536,7 +563,7 @@ function PostEditor({
         <section className={styles.writingCanvas}>
           <div className={styles.canvasMeta}><span className={post.status === "Published" ? styles.liveLabel : ""}><i />{post.status === "Published" ? "Published" : "Growing"}</span><span>{post.category}</span></div>
           <textarea className={styles.editorTitle} rows={2} placeholder="Give this thought a name…" value={post.title} onChange={(event) => updateTitle(event.target.value)} />
-          <textarea className={styles.editorDescription} rows={2} placeholder="A short invitation into the note (optional)" value={post.description} onChange={(event) => setField("description", event.target.value)} />
+          <textarea className={styles.editorDescription} rows={2} placeholder={post.category === "Shelf" ? "Author, director, artist, or studio" : "A short invitation into the note (optional)"} value={post.description} onChange={(event) => setField("description", event.target.value)} />
 
           {post.coverImage ? <div className={styles.coverPreview}><img src={post.coverImage} alt="" /><button onClick={() => setField("coverImage", "")}><Icon name="x" /> Remove cover</button></div> : null}
 
@@ -575,13 +602,18 @@ function PostEditor({
           <button className={styles.detailsToggle} onClick={() => setDetailsOpen((open) => !open)}><span>Note details</span><Icon name="chevronDown" /></button>
           {detailsOpen ? (
             <div className={styles.detailsBody}>
-              <label><span>Path</span><select value={post.category} onChange={(event) => setField("category", event.target.value)}>{categories.map((category) => <option key={category}>{category}</option>)}</select><small>Where this note lives in the garden.</small></label>
-              <label><span>Tags</span><div className={styles.tagsInput}>{post.tags.map((tag) => <button key={tag} onClick={() => setField("tags", post.tags.filter((item) => item !== tag))}>#{tag} ×</button>)}<input value={tagInput} onChange={(event) => setTagInput(event.target.value)} onBlur={addTag} onKeyDown={(event) => { if (event.key === "Enter" || event.key === ",") { event.preventDefault(); addTag(); } }} placeholder="Add a tag" /></div></label>
+              <label><span>Path</span><select value={post.category} onChange={(event) => updateCategory(event.target.value)}>{categories.map((category) => <option key={category}>{category}</option>)}</select><small>Where this note lives in the garden.</small></label>
+              {post.category === "Shelf" ? (
+                <div className={styles.shelfDetails}>
+                  <label><span>Shelf category</span><select value={normalizeShelfCategory(post.shelfCategory)} onChange={(event) => updateShelfCategory(event.target.value)}>{shelfCategories.map((category) => <option key={category}>{category}</option>)}</select><small>Choose which shelf tab this item appears under.</small></label>
+                  {normalizeShelfCategory(post.shelfCategory) !== "Music" ? <label><span>Progress badge</span><select value={normalizeShelfStatus(normalizeShelfCategory(post.shelfCategory), post.shelfStatus)} onChange={(event) => setField("shelfStatus", normalizeShelfStatus(normalizeShelfCategory(post.shelfCategory), event.target.value))}>{shelfStatuses[normalizeShelfCategory(post.shelfCategory)].map((status) => <option key={status}>{status}</option>)}</select><small>Shown as the colored badge on the public shelf.</small></label> : <p className={styles.shelfHint}>Music appears without a progress badge.</p>}
+                </div>
+              ) : <label><span>Tags</span><div className={styles.tagsInput}>{post.tags.map((tag) => <button key={tag} onClick={() => setField("tags", post.tags.filter((item) => item !== tag))}>#{tag} ×</button>)}<input value={tagInput} onChange={(event) => setTagInput(event.target.value)} onBlur={addTag} onKeyDown={(event) => { if (event.key === "Enter" || event.key === ",") { event.preventDefault(); addTag(); } }} placeholder="Add a tag" /></div></label>}
               <div className={styles.detailDivider} />
-              <label><span>Cover image</span>{post.coverImage ? <button className={styles.changeCover} onClick={() => coverInput.current?.click()}><Icon name="image" /> Change cover</button> : <button className={styles.addCover} onClick={() => coverInput.current?.click()}><Icon name="upload" /><strong>Add a cover</strong><small>JPG, PNG or WebP · 8 MB max</small></button>}</label>
+              <label><span>{post.category === "Shelf" ? "Poster or cover" : "Cover image"}</span>{post.coverImage ? <button className={styles.changeCover} onClick={() => coverInput.current?.click()}><Icon name="image" /> Change cover</button> : <button className={styles.addCover} onClick={() => coverInput.current?.click()}><Icon name="upload" /><strong>{post.category === "Shelf" ? "Upload a poster" : "Add a cover"}</strong><small>JPG, PNG or WebP · 8 MB max</small></button>}</label>
               <input hidden ref={coverInput} accept="image/*" type="file" onChange={(event) => void uploadCover(event.target.files?.[0])} />
-              <label><span>Featured link</span><input type="url" placeholder="https://…" value={post.externalUrl || ""} onChange={(event) => setField("externalUrl", event.target.value)} /></label>
-              <label><span>Video</span><input type="url" placeholder="YouTube, Vimeo, or video URL" value={post.videoUrl || ""} onChange={(event) => setField("videoUrl", event.target.value)} /></label>
+              <label><span>{post.category === "Shelf" ? "Item link" : "Featured link"}</span><input type="url" placeholder={post.category === "Shelf" ? "Goodreads, Spotify, Telegram, or any public URL" : "https://…"} value={post.externalUrl || ""} onChange={(event) => setField("externalUrl", event.target.value)} /><small>{post.category === "Shelf" ? "Optional. When set, the whole public card opens this page." : ""}</small></label>
+              {post.category !== "Shelf" ? <label><span>Video</span><input type="url" placeholder="YouTube, Vimeo, or video URL" value={post.videoUrl || ""} onChange={(event) => setField("videoUrl", event.target.value)} /></label> : null}
               <div className={styles.detailDivider} />
               <label><span>Address</span><div className={styles.slugInput}><span>/</span><input value={post.slug} onChange={(event) => setField("slug", slugify(event.target.value))} /></div></label>
               {!deleteArmed ? <button className={styles.removeNote} onClick={() => setDeleteArmed(true)}><Icon name="trash" /> Remove this note</button> : <div className={styles.deleteConfirm}><p>This removes the note from the repository.</p><div><button onClick={() => setDeleteArmed(false)}>Keep it</button><button onClick={() => void onDelete(post.id)}>Remove</button></div></div>}
@@ -594,7 +626,7 @@ function PostEditor({
         <div className={styles.previewOverlay}>
           <header><span><i />Garden preview</span><button onClick={() => setPreviewOpen(false)}><Icon name="x" /> Close</button></header>
           <article className={styles.previewArticle}>
-            <p>{post.category} {post.tags.length ? `· ${post.tags.map((tag) => `#${tag}`).join(" ")}` : ""}</p>
+            <p>{post.category === "Shelf" ? `Shelf · ${normalizeShelfCategory(post.shelfCategory)}${normalizeShelfCategory(post.shelfCategory) !== "Music" ? ` · ${normalizeShelfStatus(normalizeShelfCategory(post.shelfCategory), post.shelfStatus)}` : ""}` : `${post.category} ${post.tags.length ? `· ${post.tags.map((tag) => `#${tag}`).join(" ")}` : ""}`}</p>
             <h1>{post.title || "Untitled note"}</h1>
             {post.description ? <p className={styles.previewDescription}>{post.description}</p> : null}
             {post.coverImage ? <img className={styles.previewCover} src={post.coverImage} alt="" /> : null}
