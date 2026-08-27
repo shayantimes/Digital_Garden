@@ -2,14 +2,14 @@
 /* eslint-disable @next/next/no-img-element */
 
 import Link from "next/link";
+import { isGardenCategory, normalizeGardenCategory } from "../lib/garden-categories";
 import { gardenSettings } from "../lib/garden-config";
 import { starterPosts } from "../lib/garden-data";
 import { readGardenPosts } from "../lib/server-content";
 
 const sectionCopy: Record<string, { eyebrow: string; description: string; symbol: string }> = {
   build: { eyebrow: "Made with hands & pixels", description: "Projects that escaped the notebook and became real things.", symbol: "↗" },
-  lab: { eyebrow: "Work in public", description: "Experiments, prototypes, tests, and questions without tidy answers.", symbol: "✦" },
-  notes: { eyebrow: "Loose thoughts, kept safely", description: "Essays, observations, systems, and fragments I want to return to.", symbol: "✎" },
+  notes: { eyebrow: "Thoughts and experiments, kept safely", description: "Essays, experiments, observations, systems, and fragments I want to return to.", symbol: "✎" },
   shelf: { eyebrow: "Things that feed the garden", description: "Books, films, shows, music, and ideas worth passing along.", symbol: "⌑" },
   life: { eyebrow: "Away from the screen", description: "Biking, football, places, routines, and moments from an ordinary life.", symbol: "☼" },
 };
@@ -30,7 +30,7 @@ export async function GardenSection({ slug }: { slug: string }) {
   const copy = sectionCopy[design] || { eyebrow: "A corner of the garden", description: `Everything growing in ${title}.`, symbol: "↗" };
   const managedPosts = await readGardenPosts({ live: false }).then((result) => result.posts).catch(() => starterPosts);
   const visiblePosts = managedPosts
-      .filter((post) => post.status === "Published" && post.category === title)
+      .filter((post) => post.status === "Published" && isGardenCategory(post.category, title))
       .sort((a, b) => new Date(b.publishedAt || b.updatedAt).getTime() - new Date(a.publishedAt || a.updatedAt).getTime());
 
   return (
@@ -53,7 +53,7 @@ export async function GardenSection({ slug }: { slug: string }) {
                 <Link href={`/${slug}/${post.slug}`}>
                   <span className="content-card-visual">
                     {post.coverImage ? <img alt="" src={post.coverImage} /> : <i aria-hidden="true">{String(index + 1).padStart(2, "0")}</i>}
-                    <small>{post.category}</small>
+                    <small>{normalizeGardenCategory(post.category)}</small>
                   </span>
                   <span className="content-card-copy">
                     <span className="content-meta">{displayDate(post.publishedAt || post.updatedAt)}</span>

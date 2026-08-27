@@ -14,7 +14,8 @@ export function SiteHeader() {
     <header className="site-header">
       <div className="header-inner">
         <Link className="garden-title-link" href="/" aria-label={`${settings.headerName}'s garden, home`}>
-          {settings.headerName}&apos;s Garden
+          <span>{settings.headerName}&apos;s Garden</span>
+          <small>Personal archive · growing in public</small>
         </Link>
         <nav className="header-section-menu" aria-label="Garden sections">
           {settings.categories.map((category) => {

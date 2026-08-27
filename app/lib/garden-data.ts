@@ -1,4 +1,10 @@
-import type { GardenPost } from "./garden-types";
+import type { GardenNowItem, GardenPost } from "./garden-types";
+
+export const starterNowItems: GardenNowItem[] = [
+  { id: "now-digital-garden", label: "Working on", title: "Digital Garden v2", url: "/build" },
+  { id: "now-atomic-habits", label: "Reading", title: "Atomic Habits", url: "/shelf" },
+  { id: "now-knowing-doing", label: "Thinking about", title: "The gap between knowing and doing", url: "/notes" },
+];
 
 export const starterPosts: GardenPost[] = [
   {

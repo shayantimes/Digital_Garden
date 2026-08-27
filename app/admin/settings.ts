@@ -1,4 +1,5 @@
 import type { GardenPost, GardenSettings } from "./types";
+import { normalizeGardenCategory } from "../lib/garden-categories";
 import { normalizeShelfCategory, normalizeShelfStatus } from "../lib/shelf";
 
 export const SETTINGS_KEY = "shayan-garden-settings-v1";
@@ -11,7 +12,6 @@ export const defaultGardenSettings: GardenSettings = {
   recentCount: 10,
   categories: [
     { id: "category-build", label: "Build", slug: "build", iconImage: "" },
-    { id: "category-lab", label: "Lab", slug: "lab", iconImage: "" },
     { id: "category-notes", label: "Notes", slug: "notes", iconImage: "" },
     { id: "category-shelf", label: "Shelf", slug: "shelf", iconImage: "" },
     { id: "category-life", label: "Life", slug: "life", iconImage: "" },
@@ -53,11 +53,7 @@ export function normalizeSettings(value: unknown): GardenSettings {
 }
 
 export function normalizePost(post: GardenPost): GardenPost {
-  const legacyCategories: Record<string, string> = {
-    Thinking: "Notes",
-    Learning: "Lab",
-  };
-  const category = legacyCategories[post.category] || post.category || "Notes";
+  const category = normalizeGardenCategory(post.category);
   const shelfCategory = normalizeShelfCategory(post.shelfCategory);
   return {
     ...post,
@@ -67,8 +63,6 @@ export function normalizePost(post: GardenPost): GardenPost {
     videoUrl: post.videoUrl || "",
     externalUrl: post.externalUrl || "",
     shelfCategory,
-    shelfStatus: category === "Shelf"
-      ? normalizeShelfStatus(shelfCategory, post.shelfStatus)
-      : post.shelfStatus || "",
+    shelfStatus: category === "Shelf" ? normalizeShelfStatus(shelfCategory, post.shelfStatus) : post.shelfStatus || "",
   };
 }

@@ -18,6 +18,13 @@ export type GardenSettings = {
   categories: GardenCategory[];
 };
 
+export type GardenNowItem = {
+  id: string;
+  label: string;
+  title: string;
+  url: string;
+};
+
 export type PostVersion = {
   id: string;
   label: string;

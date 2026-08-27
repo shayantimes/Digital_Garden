@@ -4,28 +4,26 @@
 /* eslint-disable @next/next/no-img-element */
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { gardenSettings } from "../lib/garden-config";
-import { CONTENT_EVENT, fetchGardenPosts } from "../lib/garden-content";
-import { starterPosts } from "../lib/garden-data";
-import type { GardenCategory, GardenPost } from "../lib/garden-types";
+import { CONTENT_EVENT, fetchGardenNow, fetchGardenPosts } from "../lib/garden-content";
+import { starterNowItems, starterPosts } from "../lib/garden-data";
+import type { GardenCategory, GardenNowItem, GardenPost } from "../lib/garden-types";
 import styles from "./garden-home-content.module.css";
 import { PlantIcon } from "./plant-icon";
 
-type GardenSection = "build" | "lab" | "notes" | "shelf" | "life";
+type GardenSection = "build" | "notes" | "shelf" | "life";
 
 const fallbackItems: Record<GardenSection, string[]> = {
   build: ["Marketing Analytics Lab", "Pipochart Growth Engine", "Digital Garden v2"],
-  lab: ["GA4 Dashboard Test", "Automtm KPI Tracker", "Content Experiment Log"],
-  notes: ["The Gap Between Knowing and Doing", "On Building in Public", "Focus > Motivation"],
+  notes: ["The Gap Between Knowing and Doing", "GA4 Dashboard Test", "Content Experiment Log"],
   shelf: ["Dune: Part Two", "Atomic Habits", "Nujabes — Modal Soul"],
   life: ["Morning Ride", "Futsal Match Day", "Hiking Under Stars"],
 };
 
 const sectionCopy: Record<GardenSection, { intro: string; icon: string; latest: string }> = {
   build: { intro: "Things I’m building or have built. Some shipped, some still cooking.", icon: "▰", latest: "RECENT PROJECTS" },
-  lab: { intro: "Experiments, tests, random ideas, and things I’m learning.", icon: "⚗", latest: "LAST UPDATED" },
-  notes: { intro: "Thoughts, reflections, and ideas that I don’t want to forget.", icon: "✎", latest: "LATEST NOTES" },
+  notes: { intro: "Thoughts, experiments, reflections, and ideas that I don’t want to forget.", icon: "✎", latest: "LATEST NOTES" },
   shelf: { intro: "Books, movies, shows, music, and things that inspire me.", icon: "▣", latest: "RECENTLY ADDED" },
   life: { intro: "Moments from life. Biking, football, adventures, and everything in between.", icon: "⚲", latest: "LATEST ENTRIES" },
 };
@@ -35,6 +33,31 @@ function displayDate(value?: string) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "May 20";
   return new Intl.DateTimeFormat("en", { month: "short", day: "numeric" }).format(date);
+}
+
+function nowSymbol(label: string) {
+  const value = label.toLowerCase();
+  if (value.includes("read")) return "▣";
+  if (value.includes("work") || value.includes("build")) return "▰";
+  if (value.includes("watch")) return "◉";
+  if (value.includes("listen")) return "♫";
+  if (value.includes("learn") || value.includes("study")) return "✎";
+  return "✦";
+}
+
+function NowItemTitle({ item }: { item: GardenNowItem }) {
+  const copy = <>{item.label ? <span className={styles.nowLabel}>{item.label}: </span> : null}{item.title}</>;
+  if (!item.url) return <span className={styles.nowTitle}>{copy}</span>;
+  if (item.url.startsWith("/") && !item.url.startsWith("//")) return <Link href={item.url}>{copy}</Link>;
+  let isSafeExternalLink = false;
+  try {
+    const url = new URL(item.url);
+    isSafeExternalLink = ["http:", "https:"].includes(url.protocol);
+  } catch {
+    // Invalid managed links render as plain text rather than unsafe anchors.
+  }
+  if (isSafeExternalLink) return <a href={item.url} rel="noreferrer" target="_blank">{copy}</a>;
+  return <span className={styles.nowTitle}>{copy}</span>;
 }
 
 function SocialIcon({ name }: { name: "cv" | "github" | "linkedin" | "instagram" | "x" }) {
@@ -61,6 +84,7 @@ function PaperPanel({
       <span className={`${styles.tape} ${styles.panelTape}`} aria-hidden="true" />
       <header>
         <h2>{category.label.toUpperCase()}</h2>
+        <span className={styles.panelAction} aria-hidden="true">VIEW PLOT ↗</span>
       </header>
       <div className={styles.panelBody}>
         <div className={styles.panelIntro}>
@@ -84,45 +108,27 @@ export function GardenHomeContent() {
     .filter((post) => post.status === "Published")
     .sort((a, b) => new Date(b.publishedAt || b.updatedAt).getTime() - new Date(a.publishedAt || a.updatedAt).getTime()));
   const settings = gardenSettings;
-  const [gardenScale, setGardenScale] = useState(1);
-  const desktopRef = useRef<HTMLDivElement>(null);
+  const [nowItems, setNowItems] = useState<GardenNowItem[]>(starterNowItems);
 
   useEffect(() => {
     const load = async () => {
-      try {
-        const managed = (await fetchGardenPosts()).posts
+      const [postsResult, nowResult] = await Promise.allSettled([fetchGardenPosts(), fetchGardenNow()]);
+      if (postsResult.status === "fulfilled") {
+        const managed = postsResult.value.posts
           .filter((post) => post.status === "Published")
           .sort((a, b) => new Date(b.publishedAt || b.updatedAt).getTime() - new Date(a.publishedAt || a.updatedAt).getTime());
         setPosts(managed);
-      } catch {
-        // Keep the bundled garden visible if the content API is temporarily unavailable.
       }
+      if (nowResult.status === "fulfilled") setNowItems(nowResult.value.items);
+      // Keep bundled content visible when either content endpoint is temporarily unavailable.
     };
     void load();
     window.addEventListener(CONTENT_EVENT, load);
     return () => window.removeEventListener(CONTENT_EVENT, load);
   }, []);
 
-  useEffect(() => {
-    const desktop = desktopRef.current;
-    if (!desktop) return;
-    const fitGarden = () => {
-      const availableWidth = Math.max(280, window.innerWidth - 20);
-      const availableHeight = Math.max(420, window.innerHeight - 20);
-      setGardenScale(Math.min(1, availableWidth / desktop.offsetWidth, availableHeight / desktop.offsetHeight));
-    };
-    const observer = new ResizeObserver(fitGarden);
-    observer.observe(desktop);
-    window.addEventListener("resize", fitGarden);
-    fitGarden();
-    return () => {
-      observer.disconnect();
-      window.removeEventListener("resize", fitGarden);
-    };
-  }, [posts, settings]);
-
   const layoutCategories = useMemo(() => {
-    const sections: GardenSection[] = ["build", "lab", "notes", "shelf", "life"];
+    const sections: GardenSection[] = ["build", "notes", "shelf", "life"];
     return Object.fromEntries(sections.map((section, index) => [
       section,
       settings.categories.find((category) => category.id === `category-${section}`)
@@ -133,18 +139,17 @@ export function GardenHomeContent() {
 
   const postsBySection = useMemo(() => {
     const result = {} as Record<GardenSection, GardenPost[]>;
-    (["build", "lab", "notes", "shelf", "life"] as GardenSection[]).forEach((section) => {
+    (["build", "notes", "shelf", "life"] as GardenSection[]).forEach((section) => {
       result[section] = posts.filter((post) => post.category === layoutCategories[section].label);
     });
     return result;
   }, [layoutCategories, posts]);
 
-  const categoriesByLabel = useMemo(() => new Map(settings.categories.map((category) => [category.label, category])), [settings.categories]);
-
   return (
-    <section className={styles.page} style={{ "--garden-scale": gardenScale } as CSSProperties} aria-labelledby="garden-title">
-      <div className={styles.desktopWindow} ref={desktopRef}>
+    <section className={styles.page} aria-labelledby="garden-title">
+      <div className={styles.desktopWindow}>
         <header className={styles.desktopBar}>
+          <span className={styles.gardenStatus}><i aria-hidden="true" />GROWING IN PUBLIC</span>
           <h1 id="garden-title">{settings.headerName.toUpperCase()}&apos;S GARDEN</h1>
           <nav className={styles.desktopMenu} aria-label="Garden sections">
             {settings.categories.map((category) => <Link href={`/${category.slug}`} key={category.id}>{category.label}</Link>)}
@@ -154,7 +159,7 @@ export function GardenHomeContent() {
         <div className={styles.desktopBody}>
           <aside className={styles.linksPanel}>
             <span className={`${styles.tape} ${styles.linkTape}`} aria-hidden="true" />
-            <header><h2>LINKS</h2></header>
+            <header><h2>LINKS</h2><span>FIND ME / 05</span></header>
             <nav aria-label="Social links">
               <a href="#cv"><SocialIcon name="cv" /><span>CV</span></a>
               <a href="https://github.com" target="_blank" rel="noreferrer"><SocialIcon name="github" /><span>GitHub</span></a>
@@ -168,7 +173,7 @@ export function GardenHomeContent() {
           <main className={styles.workspace}>
             <article className={styles.aboutWindow}>
               <span className={`${styles.tape} ${styles.aboutTape}`} aria-hidden="true" />
-              <header><h2>ABOUT ME</h2></header>
+              <header><h2>ABOUT ME</h2><span>PROFILE / 01</span></header>
               <div className={styles.aboutBody}>
                 <div className={styles.aboutCopy}>
                   <h3>{settings.headerName.toUpperCase()}</h3>
@@ -191,25 +196,21 @@ export function GardenHomeContent() {
             </article>
 
             <div className={styles.cardGrid}>
-              <PaperPanel section="lab" category={layoutCategories.lab} posts={postsBySection.lab} />
               <PaperPanel section="notes" category={layoutCategories.notes} posts={postsBySection.notes} />
               <blockquote className={styles.quote}><span className={`${styles.tape} ${styles.quoteTape}`} aria-hidden="true" />“A garden is never<br />finished.<br />It just keeps<br />growing.” <PlantIcon className={styles.quotePlant} /></blockquote>
               <PaperPanel section="build" category={layoutCategories.build} posts={postsBySection.build} />
               <PaperPanel section="life" category={layoutCategories.life} posts={postsBySection.life} />
               <PaperPanel section="shelf" category={layoutCategories.shelf} posts={postsBySection.shelf} />
 
-              <section className={styles.recentPanel}>
-                <span className={`${styles.tape} ${styles.recentTape}`} aria-hidden="true" />
-                <h2>✦ RECENTLY PLANTED</h2>
+              <section className={styles.nowPanel}>
+                <span className={`${styles.tape} ${styles.nowTape}`} aria-hidden="true" />
+                <h2>✦ NOW</h2>
                 <ul>
-                  {(posts.length ? posts.slice(0, settings.recentCount) : starterPosts.slice(0, settings.recentCount)).slice(0, 5).map((post, index) => {
-                    const category = categoriesByLabel.get(post.category);
-                    const slug = category?.slug || post.category.toLowerCase();
-                    return <li key={post.id}><span>{category?.iconImage ? <img src={category.iconImage} alt="" /> : ["▧", "▰", "⚗", "⚲", "▣"][index]}</span><Link href={`/${slug}/${post.slug}`}>{post.category}: {post.title}</Link></li>;
-                  })}
+                  {nowItems.map((item) => <li key={item.id}><span aria-hidden="true">{nowSymbol(item.label)}</span><NowItemTitle item={item} /></li>)}
+                  {!nowItems.length ? <li className={styles.nowEmpty}><span aria-hidden="true">·</span><span>Nothing pinned here right now.</span></li> : null}
                 </ul>
                 <span className={styles.notebookHoles} aria-hidden="true">○<br />○<br />○<br />○<br />○</span>
-                <PlantIcon className={styles.recentCornerPlant} />
+                <PlantIcon className={styles.nowCornerPlant} />
               </section>
 
               <section className={styles.promise}><span className={`${styles.tape} ${styles.promiseTape}`} aria-hidden="true" /><img className={styles.wateringCan} src="/garden-icon.png" alt="" /><p>I’m not here to be perfect.<br />I’m here to be honest and<br />keep planting.</p><PlantIcon className={styles.promiseCornerPlant} /></section>
@@ -219,8 +220,9 @@ export function GardenHomeContent() {
         </div>
 
         <footer className={styles.desktopFooter}>
-          <div><PlantIcon className={styles.footerPlant} /><p><b>PLANTED BY {settings.headerName.toUpperCase()}</b><small>Keep planting. Keep growing.</small></p></div>
-          <p>© 2026 {settings.headerName}&apos;s Garden<br />Built with curiosity</p>
+          <div className={styles.footerBrand}><PlantIcon className={styles.footerPlant} /><p><b>PLANTED BY {settings.headerName.toUpperCase()}</b><small>Keep planting. Keep growing.</small></p></div>
+          <p className={styles.footerMeta}>© 2026 {settings.headerName}&apos;s Garden<small>A living archive, built with curiosity.</small></p>
+          <a className={styles.footerReturn} href="#garden-title"><span>RETURN TO</span>TOP OF GARDEN ↑</a>
         </footer>
       </div>
     </section>

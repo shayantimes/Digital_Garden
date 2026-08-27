@@ -3,6 +3,7 @@
 
 import Link from "next/link";
 import { type ReactNode } from "react";
+import { isGardenCategory, normalizeGardenCategory } from "../lib/garden-categories";
 import { gardenSettings } from "../lib/garden-config";
 import { starterPosts } from "../lib/garden-data";
 import { readGardenPosts } from "../lib/server-content";
@@ -80,7 +81,7 @@ function displayDate(value: string) {
 export async function GardenPostView({ sectionSlug, postSlug }: { sectionSlug: string; postSlug: string }) {
   const category = gardenSettings.categories.find((item) => item.slug === sectionSlug);
   const managedPosts = await readGardenPosts({ live: false }).then((result) => result.posts).catch(() => starterPosts);
-  const post = managedPosts.find((item) => item.status === "Published" && item.slug === postSlug && (!category || item.category === category.label)) || null;
+  const post = managedPosts.find((item) => item.status === "Published" && item.slug === postSlug && (!category || isGardenCategory(item.category, category.label))) || null;
   if (post === null) {
     return (
       <main className={`garden-post-page garden-post-missing theme-${sectionSlug}`}>
@@ -92,12 +93,13 @@ export async function GardenPostView({ sectionSlug, postSlug }: { sectionSlug: s
   }
 
   const embedUrl = post.videoUrl ? videoEmbed(post.videoUrl) : "";
+  const postCategory = normalizeGardenCategory(post.category);
   return (
     <main className={`garden-post-page theme-${sectionSlug}`}>
       <article>
-        <Link className="post-back-link" href={`/${sectionSlug}`}>← Back to {category?.label || post.category}</Link>
+        <Link className="post-back-link" href={`/${sectionSlug}`}>← Back to {category?.label || postCategory}</Link>
         <header className="garden-post-hero">
-          <p className="eyebrow">{post.category} · {displayDate(post.publishedAt || post.updatedAt)}</p>
+          <p className="eyebrow">{postCategory} · {displayDate(post.publishedAt || post.updatedAt)}</p>
           <h1>{post.title}</h1>
           {post.description ? <p className="garden-post-description">{post.description}</p> : null}
           {post.tags.length ? <div className="tags garden-post-tags">{post.tags.map((tag) => <span key={tag}>{tag}</span>)}</div> : null}
@@ -124,7 +126,7 @@ export async function GardenPostView({ sectionSlug, postSlug }: { sectionSlug: s
 
         <footer className="garden-post-footer">
           <span>Keep wandering through the garden.</span>
-          <Link href={`/${sectionSlug}`}>← Back to {category?.label || post.category}</Link>
+          <Link href={`/${sectionSlug}`}>← Back to {category?.label || postCategory}</Link>
         </footer>
       </article>
     </main>

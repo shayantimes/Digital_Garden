@@ -19,21 +19,29 @@ import { Icon } from "./icons";
 import { defaultGardenSettings } from "./settings";
 import type { GardenPost, PostStatus } from "./types";
 import {
+  fetchGardenNow,
   fetchGardenPosts,
   importGardenPosts,
   loadLegacyGardenPosts,
   removeGardenPost,
+  saveGardenNow,
   saveGardenPost,
   uploadGardenImage,
 } from "../lib/garden-content";
+import type { GardenNowItem } from "../lib/garden-types";
 import { normalizeShelfCategory, normalizeShelfStatus, shelfCategories, shelfStatuses } from "../lib/shelf";
 import styles from "./admin.module.css";
 
 type Filter = "All" | "Draft" | "Published";
 type SaveState = "quiet" | "saving" | "saved" | "error";
+type StudioView = "library" | "now";
 
 const LOCAL_DRAFT_PREFIX = "garden-studio-draft:";
 const categories = defaultGardenSettings.categories.map((category) => category.label);
+const nowLinkOptions = defaultGardenSettings.categories.map((category) => ({
+  label: category.label,
+  value: `/${category.slug}`,
+}));
 
 function slugify(value: string) {
   return value
@@ -74,6 +82,15 @@ function emptyPost(seed = ""): GardenPost {
     bookmarks: 0,
     comments: 0,
     versions: [],
+  };
+}
+
+function emptyNowItem(): GardenNowItem {
+  return {
+    id: `now-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+    label: "Working on",
+    title: "",
+    url: "",
   };
 }
 
@@ -144,10 +161,12 @@ function MarkdownPreview({ content, emptyMessage = "Your words will appear here.
 export default function AdminPage() {
   const [auth, setAuth] = useState<"checking" | "locked" | "ready">("checking");
   const [posts, setPosts] = useState<GardenPost[]>([]);
+  const [nowItems, setNowItems] = useState<GardenNowItem[]>([]);
   const [backend, setBackend] = useState<"github" | "local">("local");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<Filter>("All");
+  const [view, setView] = useState<StudioView>("library");
   const [section, setSection] = useState("All");
   const [query, setQuery] = useState("");
   const [seed, setSeed] = useState("");
@@ -160,15 +179,27 @@ export default function AdminPage() {
     setLoading(true);
     setError("");
     try {
-      const result = await fetchGardenPosts();
-      setPosts(result.posts);
-      setBackend(result.backend);
-      const legacy = await loadLegacyGardenPosts();
-      const candidates = legacy.filter((oldPost) => {
-        const current = result.posts.find((post) => post.id === oldPost.id);
-        return !current || new Date(oldPost.updatedAt).getTime() > new Date(current.updatedAt).getTime();
-      });
-      setLegacyPosts(candidates);
+      const [postsResult, nowResult] = await Promise.allSettled([fetchGardenPosts(), fetchGardenNow()]);
+      const issues: string[] = [];
+      if (postsResult.status === "fulfilled") {
+        setPosts(postsResult.value.posts);
+        setBackend(postsResult.value.backend);
+        const legacy = await loadLegacyGardenPosts();
+        const candidates = legacy.filter((oldPost) => {
+          const current = postsResult.value.posts.find((post) => post.id === oldPost.id);
+          return !current || new Date(oldPost.updatedAt).getTime() > new Date(current.updatedAt).getTime();
+        });
+        setLegacyPosts(candidates);
+      } else {
+        issues.push(postsResult.reason instanceof Error ? postsResult.reason.message : "The garden notes could not be opened.");
+      }
+      if (nowResult.status === "fulfilled") {
+        setNowItems(nowResult.value.items);
+        setBackend(nowResult.value.backend);
+      } else {
+        issues.push(nowResult.reason instanceof Error ? nowResult.reason.message : "The Now section could not be opened.");
+      }
+      setError(issues.join(" "));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "The garden could not be opened.");
     } finally {
@@ -307,18 +338,22 @@ export default function AdminPage() {
     <main className={styles.studio}>
       <aside className={styles.rail}>
         <div className={styles.brand}><span>G</span><div><strong>Garden</strong><small>Writing studio</small></div></div>
-        <button className={styles.writeButton} onClick={() => setEditor(emptyPost())}><Icon name="plus" /> Write a note</button>
+        <button className={styles.writeButton} onClick={() => { setView("library"); setEditor(emptyPost()); }}><Icon name="plus" /> Write a note</button>
 
         <nav className={styles.libraryNav} aria-label="Content filters">
+          <p>Homepage</p>
+          <button className={view === "now" ? `${styles.navActive} ${styles.nowNavButton}` : styles.nowNavButton} onClick={() => setView("now")}>
+            <span>Now</span><b>{nowItems.length}</b>
+          </button>
           <p>Library</p>
           {(["All", "Draft", "Published"] as Filter[]).map((item) => (
-            <button className={filter === item && section === "All" ? styles.navActive : ""} key={item} onClick={() => { setFilter(item); setSection("All"); }}>
+            <button className={view === "library" && filter === item && section === "All" ? styles.navActive : ""} key={item} onClick={() => { setView("library"); setFilter(item); setSection("All"); }}>
               <span>{item === "All" ? "All notes" : item === "Draft" ? "Growing" : "Published"}</span><b>{counts[item]}</b>
             </button>
           ))}
           <p>Paths</p>
           {categories.map((item) => (
-            <button className={section === item ? styles.navActive : ""} key={item} onClick={() => { setSection(item); setFilter("All"); }}>
+            <button className={view === "library" && section === item ? styles.navActive : ""} key={item} onClick={() => { setView("library"); setSection(item); setFilter("All"); }}>
               <span>{item}</span><b>{posts.filter((post) => post.category === item).length}</b>
             </button>
           ))}
@@ -335,6 +370,20 @@ export default function AdminPage() {
       </aside>
 
       <section className={styles.library}>
+        {view === "now" ? (
+          <NowManager
+            backend={backend}
+            initialItems={nowItems}
+            key={loading ? "now-loading" : nowItems.map((item) => `${item.id}:${item.label}:${item.title}:${item.url}`).join("|")}
+            loadError={error}
+            loading={loading}
+            onRetry={() => void load()}
+            onSaved={(items) => {
+              setNowItems(items);
+              setToast("Now section updated");
+            }}
+          />
+        ) : <>
         <header className={styles.libraryHeader}>
           <div><p>Your digital garden</p><h1>{section === "All" ? (filter === "All" ? "Everything you’re growing" : filter === "Draft" ? "Ideas still growing" : "Out in the garden") : section}</h1></div>
           <label className={styles.search}><Icon name="search" /><input aria-label="Search notes" placeholder="Search every word…" value={query} onChange={(event) => setQuery(event.target.value)} /></label>
@@ -370,9 +419,112 @@ export default function AdminPage() {
           ))}
           {!loading && !visiblePosts.length ? <div className={styles.emptyLibrary}><span>✦</span><h2>Nothing here yet.</h2><p>Plant a quick thought above or write a full note.</p></div> : null}
         </div>
+        </>}
       </section>
       {toast ? <div className={styles.toast}><Icon name="check" />{toast}</div> : null}
     </main>
+  );
+}
+
+function NowManager({
+  backend,
+  initialItems,
+  loadError,
+  loading,
+  onRetry,
+  onSaved,
+}: {
+  backend: "github" | "local";
+  initialItems: GardenNowItem[];
+  loadError: string;
+  loading: boolean;
+  onRetry: () => void;
+  onSaved: (items: GardenNowItem[]) => void;
+}) {
+  const [items, setItems] = useState<GardenNowItem[]>(initialItems);
+  const [saveState, setSaveState] = useState<SaveState>("quiet");
+  const [saveError, setSaveError] = useState("");
+
+  const updateItem = <K extends keyof GardenNowItem>(index: number, field: K, value: GardenNowItem[K]) => {
+    setSaveState("quiet");
+    setItems((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, [field]: value } : item));
+  };
+
+  const moveItem = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= items.length) return;
+    setSaveState("quiet");
+    setItems((current) => {
+      const next = [...current];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
+  };
+
+  const removeItem = (index: number) => {
+    setSaveState("quiet");
+    setItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  };
+
+  const addItem = () => {
+    if (items.length >= 5) return;
+    setSaveState("quiet");
+    setItems((current) => [...current, emptyNowItem()]);
+  };
+
+  const save = async () => {
+    const nextItems = items.map((item) => ({ ...item, label: item.label.trim(), title: item.title.trim(), url: item.url.trim() }));
+    if (nextItems.some((item) => !item.title)) {
+      setSaveError("Every Now item needs a title.");
+      setSaveState("error");
+      return;
+    }
+    setSaveError("");
+    setSaveState("saving");
+    try {
+      await saveGardenNow(nextItems);
+      setItems(nextItems);
+      onSaved(nextItems);
+      setSaveState("saved");
+    } catch (caught) {
+      setSaveError(caught instanceof Error ? caught.message : "The Now section could not be saved.");
+      setSaveState("error");
+    }
+  };
+
+  return (
+    <div className={styles.nowManager}>
+      <header className={styles.nowManagerHeader}>
+        <div><p>Homepage section</p><h1>What’s happening now</h1><span>Keep a small, living list of whatever you’re working on, reading, learning, watching, or thinking about.</span></div>
+        <button className={styles.saveNowButton} disabled={loading || saveState === "saving"} onClick={() => void save()}>{saveState === "saving" ? "Saving…" : "Save Now section"}</button>
+      </header>
+
+      {loadError ? <div className={styles.errorBanner}><span>{loadError}</span><button onClick={onRetry}>Try again</button></div> : null}
+
+      <div className={styles.nowManagerBody}>
+        <section className={styles.nowItemEditor} aria-label="Now items">
+          <div className={styles.nowEditorIntro}><strong>{loading ? "Opening…" : `${items.length} of 5 items`}</strong><span>Order here matches the homepage.</span></div>
+          {items.map((item, index) => (
+            <article className={styles.nowEditorRow} key={item.id}>
+              <div className={styles.nowRowOrder}><span>{String(index + 1).padStart(2, "0")}</span><button disabled={index === 0} aria-label={`Move ${item.title || `item ${index + 1}`} up`} onClick={() => moveItem(index, -1)}>↑</button><button disabled={index === items.length - 1} aria-label={`Move ${item.title || `item ${index + 1}`} down`} onClick={() => moveItem(index, 1)}>↓</button></div>
+              <div className={styles.nowFields}>
+                <label><span>Context</span><input maxLength={50} placeholder="Reading, Working on, Learning…" value={item.label} onChange={(event) => updateItem(index, "label", event.target.value)} /></label>
+                <label className={styles.nowTitleField}><span>What is it?</span><input maxLength={180} placeholder="The thing you want to share" value={item.title} onChange={(event) => updateItem(index, "title", event.target.value)} /></label>
+                <label className={styles.nowLinkField}><span>Destination <em>optional</em></span><select value={item.url} onChange={(event) => updateItem(index, "url", event.target.value)}><option value="">No link — show as plain text</option><optgroup label="Garden sections">{nowLinkOptions.map((option) => <option key={option.value} value={option.value}>{option.label} ({option.value})</option>)}</optgroup>{item.url && !nowLinkOptions.some((option) => option.value === item.url) ? <option value={item.url}>Current custom link</option> : null}</select></label>
+              </div>
+              <button className={styles.removeNowItem} aria-label={`Remove ${item.title || `item ${index + 1}`}`} onClick={() => removeItem(index)}><Icon name="trash" /></button>
+            </article>
+          ))}
+          {!items.length && !loading ? <div className={styles.emptyNowItems}><span>✦</span><h2>Your Now list is empty.</h2><p>Add anything that has your attention at the moment.</p></div> : null}
+          <button className={styles.addNowItem} disabled={items.length >= 5} onClick={addItem}><Icon name="plus" />{items.length >= 5 ? "The homepage holds five items" : "Add another item"}</button>
+          {saveError ? <p className={styles.nowSaveError}>{saveError}</p> : null}
+        </section>
+
+        <aside className={styles.nowHelp}>
+          <span>✦</span><h2>A useful Now list stays loose.</h2><p>The context is completely free-form. Use “Reading,” “Making,” “Recovering from,” or anything else that fits.</p><p>Choose a garden section from the destination menu, or select “No link” when the item should be plain text.</p><small>{saveState === "saved" ? "Saved and ready for the homepage." : backend === "github" ? "Saving publishes this list through GitHub." : "Saving updates this project."}</small>
+        </aside>
+      </div>
+    </div>
   );
 }
 

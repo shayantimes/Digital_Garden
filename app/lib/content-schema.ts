@@ -12,6 +12,21 @@ const optionalExternalUrl = z.string().max(2_000).refine((value) => {
   try { return ["https:", "http:"].includes(new URL(value).protocol); } catch { return false; }
 }, "Use a valid HTTP or HTTPS URL.");
 
+const optionalNowUrl = z.string().max(2_000).refine((value) => {
+  if (!value) return true;
+  if (value.startsWith("/") && !value.startsWith("//")) return true;
+  try { return ["https:", "http:"].includes(new URL(value).protocol); } catch { return false; }
+}, "Use a garden path or a valid HTTP or HTTPS URL.");
+
+export const gardenNowItemSchema = z.object({
+  id: z.string().min(5).max(100).regex(/^now-[a-zA-Z0-9-]+$/),
+  label: z.string().trim().max(50).default(""),
+  title: z.string().trim().min(1).max(180),
+  url: optionalNowUrl.default(""),
+});
+
+export const gardenNowArraySchema = z.array(gardenNowItemSchema).max(5);
+
 export const gardenPostSchema = z.object({
   id: z.string().min(3).max(100).regex(/^post-[a-zA-Z0-9-]+$/),
   title: z.string().trim().min(1).max(180),

@@ -3,11 +3,14 @@ import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { GardenPost } from "../admin/types";
-import { gardenPostSchema } from "./content-schema";
+import type { GardenNowItem } from "./garden-types";
+import { gardenNowArraySchema, gardenPostSchema } from "./content-schema";
+import { starterNowItems } from "./garden-data";
 import { parsePostMarkdown, serializePostMarkdown } from "./post-markdown";
 
 const CONTENT_DIRECTORY = "content/posts";
 const LOCAL_CONTENT_DIRECTORY = path.join(process.cwd(), CONTENT_DIRECTORY);
+const NOW_FILE = "content/now.json";
 const DEFAULT_REPOSITORY = "shayantimes/Digital_Garden";
 
 type GitHubFile = { content?: string; sha?: string };
@@ -73,10 +76,35 @@ async function readLocalPosts() {
   )));
 }
 
+function parseNowItems(raw: string) {
+  return gardenNowArraySchema.parse(JSON.parse(raw));
+}
+
+async function readGitHubNow() {
+  const file = await readGitHubFile(NOW_FILE);
+  if (!file?.content) return starterNowItems;
+  return parseNowItems(Buffer.from(file.content.replace(/\n/g, ""), "base64").toString("utf8"));
+}
+
+async function readLocalNow() {
+  try {
+    return parseNowItems(await fs.readFile(path.join(process.cwd(), NOW_FILE), "utf8"));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return starterNowItems;
+    throw error;
+  }
+}
+
 export async function readGardenPosts(options: { live?: boolean } = {}) {
   const source = options.live && githubConfig() ? "github" : "local";
   const posts = source === "github" ? await readGitHubPosts() : await readLocalPosts();
   return { posts, source } as const;
+}
+
+export async function readGardenNow(options: { live?: boolean } = {}) {
+  const source = options.live && githubConfig() ? "github" : "local";
+  const items = source === "github" ? await readGitHubNow() : await readLocalNow();
+  return { items, source } as const;
 }
 
 async function writeGitHubFile(filePath: string, bytes: Buffer, message: string) {
@@ -136,6 +164,20 @@ export async function writeGardenPost(input: GardenPost) {
 export async function writeGardenPosts(posts: GardenPost[]) {
   for (const post of posts) await writeGardenPost(post);
   return githubConfig() ? "github" as const : "local" as const;
+}
+
+export async function writeGardenNow(input: GardenNowItem[]) {
+  const items = gardenNowArraySchema.parse(input);
+  const contents = `${JSON.stringify(items, null, 2)}\n`;
+  if (githubConfig()) {
+    await writeGitHubFile(NOW_FILE, Buffer.from(contents), "Update Now section");
+    return "github" as const;
+  }
+  if (process.env.NODE_ENV === "production") throw new Error("GitHub publishing is not configured.");
+  const destination = path.join(process.cwd(), NOW_FILE);
+  await fs.mkdir(path.dirname(destination), { recursive: true });
+  await fs.writeFile(destination, contents, "utf8");
+  return "local" as const;
 }
 
 export async function deleteGardenPost(id: string) {

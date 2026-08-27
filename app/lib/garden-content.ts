@@ -1,4 +1,5 @@
 import type { GardenPost } from "../admin/types";
+import type { GardenNowItem } from "./garden-types";
 import { normalizePost, POSTS_KEY } from "../admin/settings";
 
 const DATABASE_NAME = "shayan-digital-garden";
@@ -15,12 +16,30 @@ type ContentResponse = {
   error?: string;
 };
 
+type NowResponse = {
+  items?: GardenNowItem[];
+  source?: "github" | "local";
+  backend?: "github" | "local";
+  error?: string;
+};
+
 export async function fetchGardenPosts() {
   const response = await fetch("/api/content", { cache: "no-store" });
   const result = (await response.json()) as ContentResponse;
   if (!response.ok) throw new Error(result.error || "Your garden could not be loaded.");
   return {
     posts: (result.posts || []).map(normalizePost),
+    source: result.source || "local",
+    backend: result.backend || "local",
+  };
+}
+
+export async function fetchGardenNow() {
+  const response = await fetch("/api/now", { cache: "no-store" });
+  const result = (await response.json()) as NowResponse;
+  if (!response.ok) throw new Error(result.error || "The Now section could not be loaded.");
+  return {
+    items: result.items || [],
     source: result.source || "local",
     backend: result.backend || "local",
   };
@@ -50,6 +69,15 @@ export async function saveGardenPost(post: GardenPost) {
     body: JSON.stringify({ post: normalizePost(post) }),
   });
   return parseMutationResponse(response, "Your changes could not be published.");
+}
+
+export async function saveGardenNow(items: GardenNowItem[]) {
+  const response = await fetch("/api/now", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ items }),
+  });
+  return parseMutationResponse(response, "The Now section could not be saved.");
 }
 
 export async function importGardenPosts(posts: GardenPost[]) {

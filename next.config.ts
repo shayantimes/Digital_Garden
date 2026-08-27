@@ -41,6 +41,15 @@ const nextConfig: NextConfig = {
       { source: "/admin/:path*", headers: [{ key: "Cache-Control", value: "no-store, private" }] },
     ];
   },
+  async redirects() {
+    return [
+      {
+        source: "/lab/:path*",
+        destination: "/notes/:path*",
+        permanent: true,
+      },
+    ];
+  },
 };
 
 export default nextConfig;

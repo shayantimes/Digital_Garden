@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gardenPostSchema } from "../app/lib/content-schema";
+import { gardenNowArraySchema, gardenPostSchema } from "../app/lib/content-schema";
 import { parsePostMarkdown, serializePostMarkdown } from "../app/lib/post-markdown";
 import type { GardenPost } from "../app/admin/types";
 
@@ -17,6 +17,8 @@ const post: GardenPost = {
   gallery: [],
   videoUrl: "",
   externalUrl: "https://example.com",
+  shelfCategory: "Books",
+  shelfStatus: "",
   seoTitle: "A safe note",
   seoDescription: "A short description.",
   updatedAt: "2026-08-11T10:00:00.000Z",
@@ -41,5 +43,12 @@ describe("garden content", () => {
   it("limits content, tags, and metadata", () => {
     expect(gardenPostSchema.safeParse({ ...post, title: "x".repeat(181) }).success).toBe(false);
     expect(gardenPostSchema.safeParse({ ...post, tags: Array.from({ length: 31 }, (_, index) => `tag-${index}`) }).success).toBe(false);
+  });
+
+  it("accepts safe Now items and rejects unsafe or oversized lists", () => {
+    const item = { id: "now-test-item", label: "Reading", title: "A useful book", url: "/shelf" };
+    expect(gardenNowArraySchema.safeParse([item, { ...item, id: "now-external-item", url: "https://example.com" }]).success).toBe(true);
+    expect(gardenNowArraySchema.safeParse([{ ...item, url: "javascript:alert(1)" }]).success).toBe(false);
+    expect(gardenNowArraySchema.safeParse(Array.from({ length: 6 }, (_, index) => ({ ...item, id: `now-item-${index}` }))).success).toBe(false);
   });
 });
