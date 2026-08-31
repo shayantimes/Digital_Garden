@@ -3,14 +3,17 @@ import "server-only";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { GardenPost } from "../admin/types";
-import type { GardenNowItem } from "./garden-types";
-import { gardenNowArraySchema, gardenPostSchema } from "./content-schema";
+import { gardenSettings } from "./garden-config";
+import type { GardenAccount, GardenNowItem, GardenSettings } from "./garden-types";
+import { gardenAccountSchema, gardenNowArraySchema, gardenPostSchema, gardenSettingsSchema } from "./content-schema";
 import { starterNowItems } from "./garden-data";
 import { parsePostMarkdown, serializePostMarkdown } from "./post-markdown";
 
 const CONTENT_DIRECTORY = "content/posts";
 const LOCAL_CONTENT_DIRECTORY = path.join(process.cwd(), CONTENT_DIRECTORY);
 const NOW_FILE = "content/now.json";
+const SETTINGS_FILE = "content/settings.json";
+const ACCOUNT_FILE = "content/account.json";
 const DEFAULT_REPOSITORY = "shayantimes/Digital_Garden";
 
 type GitHubFile = { content?: string; sha?: string };
@@ -95,6 +98,48 @@ async function readLocalNow() {
   }
 }
 
+function parseSettings(raw: string) {
+  return gardenSettingsSchema.parse(JSON.parse(raw));
+}
+
+async function readGitHubSettings() {
+  const file = await readGitHubFile(SETTINGS_FILE);
+  if (!file?.content) return gardenSettings;
+  return parseSettings(Buffer.from(file.content.replace(/\n/g, ""), "base64").toString("utf8"));
+}
+
+async function readLocalSettings() {
+  try {
+    return parseSettings(await fs.readFile(path.join(process.cwd(), SETTINGS_FILE), "utf8"));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return gardenSettings;
+    throw error;
+  }
+}
+
+function configuredAccount(): GardenAccount {
+  return gardenAccountSchema.parse({
+    username: process.env.GARDEN_ADMIN_USERNAME,
+    email: process.env.GARDEN_ADMIN_EMAIL,
+    userId: process.env.GARDEN_ADMIN_USER_ID || "",
+  });
+}
+
+async function readGitHubAccount() {
+  const file = await readGitHubFile(ACCOUNT_FILE);
+  if (!file?.content) return configuredAccount();
+  return gardenAccountSchema.parse(JSON.parse(Buffer.from(file.content.replace(/\n/g, ""), "base64").toString("utf8")));
+}
+
+async function readLocalAccount() {
+  try {
+    return gardenAccountSchema.parse(JSON.parse(await fs.readFile(path.join(process.cwd(), ACCOUNT_FILE), "utf8")));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return configuredAccount();
+    throw error;
+  }
+}
+
 export async function readGardenPosts(options: { live?: boolean } = {}) {
   const source = options.live && githubConfig() ? "github" : "local";
   const posts = source === "github" ? await readGitHubPosts() : await readLocalPosts();
@@ -105,6 +150,16 @@ export async function readGardenNow(options: { live?: boolean } = {}) {
   const source = options.live && githubConfig() ? "github" : "local";
   const items = source === "github" ? await readGitHubNow() : await readLocalNow();
   return { items, source } as const;
+}
+
+export async function readGardenSettings(options: { live?: boolean } = {}) {
+  const source = options.live && githubConfig() ? "github" : "local";
+  const settings = source === "github" ? await readGitHubSettings() : await readLocalSettings();
+  return { settings, source } as const;
+}
+
+export async function readGardenAccount() {
+  return githubConfig() ? readGitHubAccount() : readLocalAccount();
 }
 
 async function writeGitHubFile(filePath: string, bytes: Buffer, message: string) {
@@ -180,6 +235,34 @@ export async function writeGardenNow(input: GardenNowItem[]) {
   return "local" as const;
 }
 
+export async function writeGardenSettings(input: GardenSettings) {
+  const settings = gardenSettingsSchema.parse(input);
+  const contents = `${JSON.stringify(settings, null, 2)}\n`;
+  if (githubConfig()) {
+    await writeGitHubFile(SETTINGS_FILE, Buffer.from(contents), "Update garden settings");
+    return "github" as const;
+  }
+  if (process.env.NODE_ENV === "production") throw new Error("GitHub publishing is not configured.");
+  const destination = path.join(process.cwd(), SETTINGS_FILE);
+  await fs.mkdir(path.dirname(destination), { recursive: true });
+  await fs.writeFile(destination, contents, "utf8");
+  return "local" as const;
+}
+
+export async function writeGardenAccount(input: GardenAccount) {
+  const account = gardenAccountSchema.parse(input);
+  const contents = `${JSON.stringify(account, null, 2)}\n`;
+  if (githubConfig()) {
+    await writeGitHubFile(ACCOUNT_FILE, Buffer.from(contents), "Update garden account profile");
+    return "github" as const;
+  }
+  if (process.env.NODE_ENV === "production") throw new Error("GitHub publishing is not configured.");
+  const destination = path.join(process.cwd(), ACCOUNT_FILE);
+  await fs.mkdir(path.dirname(destination), { recursive: true });
+  await fs.writeFile(destination, contents, "utf8");
+  return "local" as const;
+}
+
 export async function deleteGardenPost(id: string) {
   const filePath = postPath(id);
   if (githubConfig()) {
@@ -202,6 +285,50 @@ export async function writeGardenMedia(fileName: string, bytes: Buffer) {
   await fs.mkdir(path.dirname(destination), { recursive: true });
   await fs.writeFile(destination, bytes);
   return `/uploads/${fileName}`;
+}
+
+export async function writeGardenFile(fileName: string, bytes: Buffer) {
+  const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, "-");
+  const relativePath = `public/uploads/${safeName}`;
+  if (githubConfig()) {
+    await writeGitHubFile(relativePath, bytes, `Add garden file ${safeName}`);
+    return `/uploads/${safeName}`;
+  }
+  if (process.env.NODE_ENV === "production") throw new Error("GitHub file publishing is not configured.");
+  const destination = path.join(process.cwd(), relativePath);
+  await fs.mkdir(path.dirname(destination), { recursive: true });
+  await fs.writeFile(destination, bytes);
+  return `/uploads/${safeName}`;
+}
+
+export async function readGardenBackupFiles() {
+  const live = Boolean(githubConfig());
+  const [postsResult, nowResult, settingsResult] = await Promise.all([
+    readGardenPosts({ live }),
+    readGardenNow({ live }),
+    readGardenSettings({ live }),
+  ]);
+  const files = new Map<string, Buffer>();
+  for (const post of postsResult.posts) files.set(`content/posts/${post.id}.md`, Buffer.from(serializePostMarkdown(post)));
+  files.set(NOW_FILE, Buffer.from(`${JSON.stringify(nowResult.items, null, 2)}\n`));
+  files.set(SETTINGS_FILE, Buffer.from(`${JSON.stringify(settingsResult.settings, null, 2)}\n`));
+
+  if (live) {
+    const uploads = await githubRequest<GitHubDirectoryItem[]>("public/uploads");
+    if (Array.isArray(uploads)) {
+      await Promise.all(uploads.filter((item) => item.type === "file").map(async (item) => {
+        const file = await readGitHubFile(item.path);
+        if (file?.content) files.set(item.path, Buffer.from(file.content.replace(/\n/g, ""), "base64"));
+      }));
+    }
+  } else {
+    const uploadsDirectory = path.join(process.cwd(), "public/uploads");
+    const uploads = await fs.readdir(uploadsDirectory, { withFileTypes: true }).catch(() => []);
+    await Promise.all(uploads.filter((item) => item.isFile()).map(async (item) => {
+      files.set(`public/uploads/${item.name}`, await fs.readFile(path.join(uploadsDirectory, item.name)));
+    }));
+  }
+  return Array.from(files, ([name, data]) => ({ name, data }));
 }
 
 export function contentBackend() {

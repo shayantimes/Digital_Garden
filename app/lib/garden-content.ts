@@ -1,6 +1,6 @@
 import type { GardenPost } from "../admin/types";
-import type { GardenNowItem } from "./garden-types";
-import { normalizePost, POSTS_KEY } from "../admin/settings";
+import type { GardenNowItem, GardenSettings } from "./garden-types";
+import { normalizePost, normalizeSettings, POSTS_KEY } from "../admin/settings";
 
 const DATABASE_NAME = "shayan-digital-garden";
 const DATABASE_VERSION = 1;
@@ -23,6 +23,13 @@ type NowResponse = {
   error?: string;
 };
 
+type SettingsResponse = {
+  settings?: GardenSettings;
+  source?: "github" | "local";
+  backend?: "github" | "local";
+  error?: string;
+};
+
 export async function fetchGardenPosts() {
   const response = await fetch("/api/content", { cache: "no-store" });
   const result = (await response.json()) as ContentResponse;
@@ -40,6 +47,17 @@ export async function fetchGardenNow() {
   if (!response.ok) throw new Error(result.error || "The Now section could not be loaded.");
   return {
     items: result.items || [],
+    source: result.source || "local",
+    backend: result.backend || "local",
+  };
+}
+
+export async function fetchGardenSettings() {
+  const response = await fetch("/api/settings", { cache: "no-store" });
+  const result = (await response.json()) as SettingsResponse;
+  if (!response.ok) throw new Error(result.error || "Garden settings could not be loaded.");
+  return {
+    settings: normalizeSettings(result.settings),
     source: result.source || "local",
     backend: result.backend || "local",
   };
@@ -78,6 +96,15 @@ export async function saveGardenNow(items: GardenNowItem[]) {
     body: JSON.stringify({ items }),
   });
   return parseMutationResponse(response, "The Now section could not be saved.");
+}
+
+export async function saveGardenSettings(settings: GardenSettings) {
+  const response = await fetch("/api/settings", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ settings: normalizeSettings(settings) }),
+  });
+  return parseMutationResponse(response, "Garden settings could not be saved.");
 }
 
 export async function importGardenPosts(posts: GardenPost[]) {
@@ -138,5 +165,14 @@ export async function uploadGardenImage(file: File) {
   const response = await fetch("/api/media", { method: "POST", body: form });
   const result = (await response.json()) as { url?: string; error?: string };
   if (!response.ok || !result.url) throw new Error(result.error || "That image could not be uploaded.");
+  return result.url;
+}
+
+export async function uploadGardenCv(file: File) {
+  const form = new FormData();
+  form.append("file", file);
+  const response = await fetch("/api/files", { method: "POST", body: form });
+  const result = (await response.json()) as { url?: string; error?: string };
+  if (!response.ok || !result.url) throw new Error(result.error || "The CV could not be uploaded.");
   return result.url;
 }

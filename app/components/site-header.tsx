@@ -2,13 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { gardenSettings } from "../lib/garden-config";
+import { CONTENT_EVENT, fetchGardenSettings } from "../lib/garden-content";
 
 export function SiteHeader() {
   const pathname = usePathname();
-  const settings = gardenSettings;
+  const [settings, setSettings] = useState(gardenSettings);
 
-  if (pathname === "/") return null;
+  useEffect(() => {
+    const load = () => void fetchGardenSettings().then((result) => setSettings(result.settings)).catch(() => undefined);
+    load();
+    window.addEventListener(CONTENT_EVENT, load);
+    return () => window.removeEventListener(CONTENT_EVENT, load);
+  }, []);
+
+  if (pathname === "/" || pathname.startsWith("/admin")) return null;
 
   return (
     <header className="site-header">

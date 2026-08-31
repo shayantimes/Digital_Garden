@@ -1,3 +1,26 @@
+# Private account information
+/content/account.json
+
+# Private CV and resume documents
+/public/uploads/*cv*.pdf
+/public/uploads/*resume*.pdf
+
+# Backups and local databases
+/backups/
+/content/backups/
+*.bak
+*.backup
+*.sqlite
+*.sqlite3
+*.db
+
+# Private credentials and keys
+*.key
+*.p12
+*.pfx
+*credentials*.json
+*service-account*.json
+
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 # dependencies

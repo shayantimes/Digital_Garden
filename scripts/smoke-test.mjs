@@ -36,6 +36,23 @@ const unauthorizedResponse = await fetch(new URL("/api/content", baseUrl), {
 });
 assert(unauthorizedResponse.status === 401, "An unauthenticated same-origin write was not rejected.");
 
+const settingsResponse = await fetch(new URL("/api/settings", baseUrl));
+const settings = await settingsResponse.json();
+assert(settingsResponse.ok && settings.settings?.headerName, "Public homepage settings are unavailable.");
+
+const settingsWriteResponse = await fetch(new URL("/api/settings", baseUrl), {
+  method: "PUT",
+  headers: { "Content-Type": "application/json", Origin: baseUrl.origin },
+  body: JSON.stringify({ settings: {} }),
+});
+assert(settingsWriteResponse.status === 401, "Unauthenticated homepage settings changes were not rejected.");
+
+const accountResponse = await fetch(new URL("/api/account", baseUrl));
+assert(accountResponse.status === 401, "Private account details leaked without authentication.");
+
+const backupResponse = await fetch(new URL("/api/backup", baseUrl));
+assert(backupResponse.status === 401, "A garden backup was available without authentication.");
+
 const healthResponse = await fetch(new URL("/api/health", baseUrl));
 const health = await healthResponse.json();
 assert(healthResponse.ok && health.status === "ok", "Production health check is not healthy.");
@@ -48,5 +65,5 @@ assert(homeResponse.headers.get("x-content-type-options") === "nosniff", "MIME s
 console.log(JSON.stringify({
   status: "ok",
   publishedPosts: content.posts.length,
-  checks: ["draft privacy", "password login", "OAuth removal", "admin redirect", "CSRF", "authorization", "health", "security headers"],
+  checks: ["draft privacy", "password login", "OAuth removal", "admin redirect", "CSRF", "authorization", "homepage settings", "account privacy", "backup privacy", "health", "security headers"],
 }, null, 2));

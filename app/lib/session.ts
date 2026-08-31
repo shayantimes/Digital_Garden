@@ -19,8 +19,12 @@ export function sessionCookieOptions(maxAge = 3_600) {
 }
 
 export async function currentSession() {
+  return verifyOwnerAccessToken(await currentAccessToken());
+}
+
+export async function currentAccessToken() {
   const store = await cookies();
-  return verifyOwnerAccessToken(store.get(sessionCookieName())?.value);
+  return store.get(sessionCookieName())?.value || null;
 }
 
 export async function isAdminRequest(request: Request) {

@@ -11,11 +11,33 @@ export type GardenCategory = {
   iconImage: string;
 };
 
+export type GardenSocialLinks = {
+  email: string;
+  github: string;
+  instagram: string;
+  linkedin: string;
+  x: string;
+};
+
 export type GardenSettings = {
   headerName: string;
   profileImage: string;
   recentCount: number;
+  fieldNotes: string;
+  profileRoles: string;
+  profileTitle: string;
+  photoCaption: string;
+  fieldNoteQuote: string;
+  gardenPromise: string;
+  socialLinks: GardenSocialLinks;
+  cvUrl: string;
   categories: GardenCategory[];
+};
+
+export type GardenAccount = {
+  username: string;
+  email: string;
+  userId: string;
 };
 
 export type GardenNowItem = {

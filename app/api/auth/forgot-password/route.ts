@@ -14,7 +14,7 @@ export async function POST(request: Request) {
   const parsed = forgotPasswordSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ message: genericMessage });
   try {
-    if (ownerIdentityMatches(parsed.data.identity)) {
+    if (await ownerIdentityMatches(parsed.data.identity)) {
       const redirect = new URL("/admin/reset-password", publicSiteUrl(request));
       const forwardedIp = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
       await sendOwnerPasswordReset(redirect.toString(), forwardedIp);

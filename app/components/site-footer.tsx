@@ -9,7 +9,7 @@ export function SiteFooter() {
   const pathname = usePathname();
   const settings = gardenSettings;
 
-  if (pathname === "/") return null;
+  if (pathname === "/" || pathname.startsWith("/admin")) return null;
 
   return (
     <footer className="site-footer">

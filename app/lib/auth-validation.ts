@@ -28,6 +28,18 @@ export const strongPasswordSchema = z.string()
   .regex(/[0-9]/, "Add a number.")
   .regex(/[^A-Za-z0-9]/, "Add a symbol.");
 
+export const accountUpdateSchema = z.object({
+  username: z.string().trim().min(3).max(64).regex(/^[a-zA-Z0-9._-]+$/, "Use letters, numbers, dots, dashes, or underscores."),
+  email: z.email("Enter a valid email address.").trim(),
+  newPassword: z.string().max(128).default(""),
+}).superRefine((value, context) => {
+  if (!value.newPassword) return;
+  const password = strongPasswordSchema.safeParse(value.newPassword);
+  if (!password.success) {
+    for (const issue of password.error.issues) context.addIssue({ ...issue, path: ["newPassword"] });
+  }
+});
+
 export const resetPasswordSchema = z.object({
   accessToken: z.string().min(20).max(8_192),
   password: strongPasswordSchema,

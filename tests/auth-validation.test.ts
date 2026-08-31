@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { identityMatchesOwner, loginSchema, setupOwnerSchema, strongPasswordSchema } from "../app/lib/auth-validation";
+import { accountUpdateSchema, identityMatchesOwner, loginSchema, setupOwnerSchema, strongPasswordSchema } from "../app/lib/auth-validation";
 
 describe("admin credential validation", () => {
   it("accepts the owner username or email without case sensitivity", () => {
@@ -21,5 +21,10 @@ describe("admin credential validation", () => {
   it("validates one-time owner account creation", () => {
     expect(setupOwnerSchema.safeParse({ username: "shayanzi79", email: "owner@example.com", password: "A-strong-password-2026" }).success).toBe(true);
     expect(setupOwnerSchema.safeParse({ username: "bad name", email: "not-email", password: "weak" }).success).toBe(false);
+  });
+
+  it("validates account changes and allows an unchanged password", () => {
+    expect(accountUpdateSchema.safeParse({ username: "shayan", email: "owner@example.com", newPassword: "" }).success).toBe(true);
+    expect(accountUpdateSchema.safeParse({ username: "shayan", email: "owner@example.com", newPassword: "weak" }).success).toBe(false);
   });
 });

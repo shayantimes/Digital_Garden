@@ -6,7 +6,7 @@ import { type ReactNode } from "react";
 import { isGardenCategory, normalizeGardenCategory } from "../lib/garden-categories";
 import { gardenSettings } from "../lib/garden-config";
 import { starterPosts } from "../lib/garden-data";
-import { readGardenPosts } from "../lib/server-content";
+import { readGardenPosts, readGardenSettings } from "../lib/server-content";
 
 function safeLink(value: string) {
   if (value.startsWith("/") && !value.startsWith("//")) return value;
@@ -79,9 +79,11 @@ function displayDate(value: string) {
 }
 
 export async function GardenPostView({ sectionSlug, postSlug }: { sectionSlug: string; postSlug: string }) {
-  const category = gardenSettings.categories.find((item) => item.slug === sectionSlug);
+  const settings = await readGardenSettings({ live: false }).then((result) => result.settings).catch(() => gardenSettings);
+  const category = settings.categories.find((item) => item.slug === sectionSlug);
+  const canonicalCategory = category?.id ? canonicalCategoryName(category.id) : "";
   const managedPosts = await readGardenPosts({ live: false }).then((result) => result.posts).catch(() => starterPosts);
-  const post = managedPosts.find((item) => item.status === "Published" && item.slug === postSlug && (!category || isGardenCategory(item.category, category.label))) || null;
+  const post = managedPosts.find((item) => item.status === "Published" && item.slug === postSlug && (!category || isGardenCategory(item.category, canonicalCategory))) || null;
   if (post === null) {
     return (
       <main className={`garden-post-page garden-post-missing theme-${sectionSlug}`}>
@@ -131,4 +133,9 @@ export async function GardenPostView({ sectionSlug, postSlug }: { sectionSlug: s
       </article>
     </main>
   );
+}
+
+function canonicalCategoryName(categoryId: string) {
+  const value = categoryId.replace(/^category-/, "");
+  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
 }

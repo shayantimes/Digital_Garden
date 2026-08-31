@@ -1,10 +1,13 @@
 import "server-only";
 
 import { identityMatchesOwner } from "./auth-validation";
+import { readGardenAccount } from "./server-content";
+import type { GardenAccount } from "./garden-types";
 
 type SupabaseUser = {
   id?: string;
   email?: string;
+  user_metadata?: { username?: string };
 };
 
 type SupabaseTokenResponse = {
@@ -47,7 +50,8 @@ function authHeaders(publishableKey: string, accessToken?: string) {
 }
 
 function isOwner(user: SupabaseUser, ownerEmail: string, ownerUserId: string) {
-  return user.email?.toLowerCase() === ownerEmail && (!ownerUserId || user.id === ownerUserId);
+  if (ownerUserId) return user.id === ownerUserId;
+  return user.email?.toLowerCase() === ownerEmail;
 }
 
 export function authConfigurationStatus() {
@@ -60,31 +64,38 @@ export function ownerSetupEnabled() {
   return process.env.GARDEN_OWNER_SETUP_ENABLED?.trim().toLowerCase() === "true";
 }
 
-export function ownerIdentityMatches(identity: string) {
-  const { ownerEmail, ownerUsername } = config();
-  return identityMatchesOwner(identity, ownerUsername, ownerEmail);
+async function ownerAccount() {
+  const configured = config();
+  return readGardenAccount().catch(() => ({ username: configured.ownerUsername, email: configured.ownerEmail, userId: configured.ownerUserId }));
+}
+
+export async function ownerIdentityMatches(identity: string) {
+  const account = await ownerAccount();
+  return identityMatchesOwner(identity, account.username, account.email);
 }
 
 export async function signInOwner(identity: string, password: string, forwardedIp?: string) {
-  const { baseUrl, publishableKey, ownerEmail, ownerUsername, ownerUserId } = config();
-  if (!identityMatchesOwner(identity, ownerUsername, ownerEmail)) return null;
+  const { baseUrl, publishableKey, ownerUserId } = config();
+  const account = await ownerAccount();
+  const immutableOwnerId = account.userId || ownerUserId;
+  if (!identityMatchesOwner(identity, account.username, account.email)) return null;
   const response = await fetch(`${baseUrl}/auth/v1/token?grant_type=password`, {
     method: "POST",
     headers: {
       ...authHeaders(publishableKey),
       ...(forwardedIp ? { "Sb-Forwarded-For": forwardedIp } : {}),
     },
-    body: JSON.stringify({ email: ownerEmail, password }),
+    body: JSON.stringify({ email: account.email, password }),
     cache: "no-store",
   });
   if (!response.ok) return null;
   const result = await response.json() as SupabaseTokenResponse;
-  if (!result.access_token || !result.user || !isOwner(result.user, ownerEmail, ownerUserId)) return null;
+  if (!result.access_token || !result.user || !isOwner(result.user, account.email, immutableOwnerId)) return null;
   return {
     accessToken: result.access_token,
     expiresIn: Math.min(Math.max(result.expires_in || 3_600, 300), 3_600),
-    email: ownerEmail,
-    username: ownerUsername,
+    email: account.email,
+    username: account.username,
   };
 }
 
@@ -110,15 +121,38 @@ export async function createOwnerAccount(username: string, email: string, passwo
 
 export async function verifyOwnerAccessToken(accessToken?: string | null) {
   if (!accessToken) return null;
-  const { baseUrl, publishableKey, ownerEmail, ownerUsername, ownerUserId } = config();
+  const { baseUrl, publishableKey, ownerUserId } = config();
+  const account = await ownerAccount();
+  const immutableOwnerId = account.userId || ownerUserId;
   const response = await fetch(`${baseUrl}/auth/v1/user`, {
     headers: authHeaders(publishableKey, accessToken),
     cache: "no-store",
   }).catch(() => null);
   if (!response?.ok) return null;
   const user = await response.json() as SupabaseUser;
-  if (!isOwner(user, ownerEmail, ownerUserId)) return null;
-  return { id: ownerUserId, email: ownerEmail, username: ownerUsername };
+  if (!isOwner(user, account.email, immutableOwnerId)) return null;
+  return { id: user.id || immutableOwnerId, email: account.email, username: account.username };
+}
+
+export async function updateOwnerCredentials(accessToken: string, account: GardenAccount, newPassword: string) {
+  const { baseUrl, publishableKey } = config();
+  const current = await ownerAccount();
+  const owner = await verifyOwnerAccessToken(accessToken);
+  if (!owner?.id) throw new Error("Your session has expired. Sign in again.");
+  const body: Record<string, unknown> = { data: { username: account.username } };
+  if (account.email.toLowerCase() !== current.email.toLowerCase()) body.email = account.email;
+  if (newPassword) body.password = newPassword;
+  const response = await fetch(`${baseUrl}/auth/v1/user`, {
+    method: "PUT",
+    headers: authHeaders(publishableKey, accessToken),
+    body: JSON.stringify(body),
+    cache: "no-store",
+  });
+  if (!response.ok) {
+    const details = await response.json().catch(() => null) as { msg?: string; message?: string } | null;
+    throw new Error(details?.msg || details?.message || "The account could not be updated.");
+  }
+  return owner.id;
 }
 
 export async function sendOwnerPasswordReset(redirectTo: string, forwardedIp?: string) {

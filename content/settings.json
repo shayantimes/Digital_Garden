@@ -1,0 +1,40 @@
+{
+  "headerName": "Shayan",
+  "profileImage": "",
+  "recentCount": 10,
+  "fieldNotes": "I explore, build, write, and share things that shape my mind and life. This is my space to grow in public.",
+  "socialLinks": {
+    "email": "shayanzi79@gmail.com",
+    "github": "https://github.com",
+    "instagram": "https://instagram.com",
+    "linkedin": "https://linkedin.com",
+    "x": "https://x.com"
+  },
+  "cvUrl": "/uploads/shayan-cv-1787920400896.pdf",
+  "categories": [
+    {
+      "id": "category-build",
+      "label": "Build",
+      "slug": "build",
+      "iconImage": "/uploads/1787920433790-04352dd2-archive.png"
+    },
+    {
+      "id": "category-notes",
+      "label": "Notes",
+      "slug": "notes",
+      "iconImage": "/uploads/1787920440500-40c72142-writing.png"
+    },
+    {
+      "id": "category-shelf",
+      "label": "Shelf",
+      "slug": "shelf",
+      "iconImage": "/uploads/1787920446441-7b9cf8c0-media.png"
+    },
+    {
+      "id": "category-life",
+      "label": "Life",
+      "slug": "life",
+      "iconImage": "/uploads/1787920452531-757329df-cycling.png"
+    }
+  ]
+}

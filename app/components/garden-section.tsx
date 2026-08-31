@@ -5,7 +5,7 @@ import Link from "next/link";
 import { isGardenCategory, normalizeGardenCategory } from "../lib/garden-categories";
 import { gardenSettings } from "../lib/garden-config";
 import { starterPosts } from "../lib/garden-data";
-import { readGardenPosts } from "../lib/server-content";
+import { readGardenPosts, readGardenSettings } from "../lib/server-content";
 
 const sectionCopy: Record<string, { eyebrow: string; description: string; symbol: string }> = {
   build: { eyebrow: "Made with hands & pixels", description: "Projects that escaped the notebook and became real things.", symbol: "↗" },
@@ -21,16 +21,17 @@ function displayDate(value: string) {
 
 export async function GardenSection({ slug }: { slug: string }) {
   const fallbackTitle = slug.split("-").map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(" ");
-  const settings = gardenSettings;
+  const settings = await readGardenSettings({ live: false }).then((result) => result.settings).catch(() => gardenSettings);
 
   const category = settings.categories.find((item) => item.slug === slug);
   const title = category?.label || fallbackTitle;
   const categoryDesign = category?.id.replace(/^category-/, "") || slug;
   const design = sectionCopy[categoryDesign] ? categoryDesign : slug;
   const copy = sectionCopy[design] || { eyebrow: "A corner of the garden", description: `Everything growing in ${title}.`, symbol: "↗" };
+  const canonicalTitle = category?.id ? canonicalCategoryName(category.id) : title;
   const managedPosts = await readGardenPosts({ live: false }).then((result) => result.posts).catch(() => starterPosts);
   const visiblePosts = managedPosts
-      .filter((post) => post.status === "Published" && isGardenCategory(post.category, title))
+      .filter((post) => post.status === "Published" && isGardenCategory(post.category, canonicalTitle))
       .sort((a, b) => new Date(b.publishedAt || b.updatedAt).getTime() - new Date(a.publishedAt || a.updatedAt).getTime());
 
   return (
@@ -75,4 +76,9 @@ export async function GardenSection({ slug }: { slug: string }) {
       )}
     </main>
   );
+}
+
+function canonicalCategoryName(categoryId: string) {
+  const value = categoryId.replace(/^category-/, "");
+  return `${value.charAt(0).toUpperCase()}${value.slice(1)}`;
 }

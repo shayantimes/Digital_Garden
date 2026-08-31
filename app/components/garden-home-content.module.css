@@ -285,13 +285,14 @@
 
 .roles {
   width: fit-content;
+  max-width: 100%;
   margin: 0 0 7px;
   padding: 4px 7px 3px;
   border: 1px solid rgba(56, 74, 52, .18);
   background: #c2cfad;
   font-size: 12px;
   font-weight: 800;
-  white-space: nowrap;
+  white-space: normal;
 }
 
 .aboutCopy strong {
@@ -302,6 +303,7 @@
 }
 
 .bio {
+  white-space: pre-line;
   margin: 0 0 20px 4px;
   font-size: 13px;
   font-weight: 650;
@@ -361,6 +363,8 @@
 .managedPortrait img { width: 100%; height: 100%; display: block; object-fit: cover; }
 .polaroid figcaption { margin: 11px 5px 0; color: var(--garden-ink-muted); font-size: 11px; line-height: 1.5; }
 .polaroid figcaption b { color: var(--garden-ink); font-size: 12px; }
+.photoCaptionBody,
+.quoteText { white-space: pre-line; }
 .photoTape { top: -9px; right: 55px; width: 94px; height: 25px; rotate: -1deg; }
 .photoSprout { position: absolute; right: 11px; bottom: 5px; width: 34px; height: 35px; rotate: -7deg; }
 
@@ -608,8 +612,8 @@
 .nowPanel ul { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; font-size: 10px; font-weight: 700; }
 .nowPanel li { min-height: 18px; display: grid; grid-template-columns: 18px 1fr; gap: 8px; align-items: center; }
 .nowPanel li > span:first-child { width: 18px; height: 18px; display: grid; place-items: center; }
-.nowPanel a { text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
-.nowPanel a:hover { background: #e4c375; }
+.nowPanel a { color: inherit; text-decoration: none; }
+.nowPanel a:hover { background: transparent; }
 .nowLabel { font-weight: 900; }
 .nowTitle { line-height: 1.4; }
 .nowEmpty { color: rgba(44, 44, 36, .62); font-style: italic; font-weight: 600; }
@@ -634,7 +638,7 @@
 .promiseTape { top: -12px; left: 43%; width: 76px; height: 22px; rotate: -3deg; }
 .wateringCan { width: 84px; height: 78px; display: block; object-fit: contain; rotate: -3deg; }
 .promiseCornerPlant { position: absolute; right: 9px; bottom: 6px; width: 27px; height: 29px; rotate: -6deg; }
-.promise p { margin: 0; font-size: 11px; font-weight: 700; line-height: 1.65; }
+.promise p { margin: 0; font-size: 11px; font-weight: 700; line-height: 1.65; white-space: pre-line; }
 
 .desktopFooter {
   min-height: 104px;
@@ -771,12 +775,11 @@
   .desktopBar h1 { font-size: 21px; }
   .desktopBody { padding-right: 12px; padding-left: 12px; }
   .linksPanel nav { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .roles { white-space: normal; }
   .panelAction { display: none; }
   .paperPanel time { display: block; float: none; margin: 3px 0 0; }
   .promise { grid-template-columns: 58px 1fr; gap: 13px; padding-right: 18px; padding-left: 18px; }
   .wateringCan { width: 56px; height: 55px; }
-  .promise p br { display: none; }
+  .promise p { white-space: normal; }
   .desktopFooter { grid-template-columns: 1fr; }
   .footerReturn { justify-items: start; padding: 0; }
 }

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { gardenNowArraySchema, gardenPostSchema } from "../app/lib/content-schema";
+import { gardenNowArraySchema, gardenPostSchema, gardenSettingsSchema } from "../app/lib/content-schema";
+import { gardenSettings } from "../app/lib/garden-config";
 import { parsePostMarkdown, serializePostMarkdown } from "../app/lib/post-markdown";
 import type { GardenPost } from "../app/admin/types";
 
@@ -50,5 +51,29 @@ describe("garden content", () => {
     expect(gardenNowArraySchema.safeParse([item, { ...item, id: "now-external-item", url: "https://example.com" }]).success).toBe(true);
     expect(gardenNowArraySchema.safeParse([{ ...item, url: "javascript:alert(1)" }]).success).toBe(false);
     expect(gardenNowArraySchema.safeParse(Array.from({ length: 6 }, (_, index) => ({ ...item, id: `now-item-${index}` }))).success).toBe(false);
+  });
+
+  it("adds editable homepage-copy defaults to legacy settings", () => {
+    const legacySettings = {
+      headerName: gardenSettings.headerName,
+      profileImage: gardenSettings.profileImage,
+      recentCount: gardenSettings.recentCount,
+      fieldNotes: gardenSettings.fieldNotes,
+      socialLinks: gardenSettings.socialLinks,
+      cvUrl: gardenSettings.cvUrl,
+      categories: gardenSettings.categories,
+    };
+
+    const parsed = gardenSettingsSchema.parse(legacySettings);
+    expect(parsed.profileRoles).toBe("Marketer • Analyst • Builder");
+    expect(parsed.profileTitle).toBe("Digital Gardener");
+    expect(parsed.photoCaption).toContain("Building a life");
+    expect(parsed.fieldNoteQuote).toContain("garden is never");
+    expect(parsed.gardenPromise).toContain("not here to be perfect");
+  });
+
+  it("limits the managed homepage copy", () => {
+    expect(gardenSettingsSchema.safeParse({ ...gardenSettings, fieldNoteQuote: "x".repeat(401) }).success).toBe(false);
+    expect(gardenSettingsSchema.safeParse({ ...gardenSettings, gardenPromise: "x".repeat(401) }).success).toBe(false);
   });
 });

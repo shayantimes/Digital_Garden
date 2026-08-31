@@ -10,6 +10,20 @@ export const defaultGardenSettings: GardenSettings = {
   headerName: "Shayan",
   profileImage: "",
   recentCount: 10,
+  fieldNotes: "I explore, build, write, and share things that shape my mind and life. This is my space to grow in public.",
+  profileRoles: "Marketer • Analyst • Builder",
+  profileTitle: "Digital Gardener",
+  photoCaption: "Building a life\nI don’t want to escape from.",
+  fieldNoteQuote: "A garden is never\nfinished.\nIt just keeps\ngrowing.",
+  gardenPromise: "I’m not here to be perfect.\nI’m here to be honest and\nkeep planting.",
+  socialLinks: {
+    email: "",
+    github: "https://github.com",
+    instagram: "https://instagram.com",
+    linkedin: "https://linkedin.com",
+    x: "https://x.com",
+  },
+  cvUrl: "",
   categories: [
     { id: "category-build", label: "Build", slug: "build", iconImage: "" },
     { id: "category-notes", label: "Notes", slug: "notes", iconImage: "" },
@@ -48,6 +62,32 @@ export function normalizeSettings(value: unknown): GardenSettings {
     recentCount: typeof candidate.recentCount === "number" && Number.isFinite(candidate.recentCount)
       ? Math.min(30, Math.max(1, Math.round(candidate.recentCount)))
       : defaultGardenSettings.recentCount,
+    fieldNotes: typeof candidate.fieldNotes === "string"
+      ? candidate.fieldNotes.trim().slice(0, 1_200)
+      : defaultGardenSettings.fieldNotes,
+    profileRoles: typeof candidate.profileRoles === "string"
+      ? candidate.profileRoles.trim().slice(0, 180)
+      : defaultGardenSettings.profileRoles,
+    profileTitle: typeof candidate.profileTitle === "string"
+      ? candidate.profileTitle.trim().slice(0, 100)
+      : defaultGardenSettings.profileTitle,
+    photoCaption: typeof candidate.photoCaption === "string"
+      ? candidate.photoCaption.trim().slice(0, 280)
+      : defaultGardenSettings.photoCaption,
+    fieldNoteQuote: typeof candidate.fieldNoteQuote === "string"
+      ? candidate.fieldNoteQuote.trim().slice(0, 400)
+      : defaultGardenSettings.fieldNoteQuote,
+    gardenPromise: typeof candidate.gardenPromise === "string"
+      ? candidate.gardenPromise.trim().slice(0, 400)
+      : defaultGardenSettings.gardenPromise,
+    socialLinks: {
+      email: typeof candidate.socialLinks?.email === "string" ? candidate.socialLinks.email.trim() : "",
+      github: typeof candidate.socialLinks?.github === "string" ? candidate.socialLinks.github.trim() : "",
+      instagram: typeof candidate.socialLinks?.instagram === "string" ? candidate.socialLinks.instagram.trim() : "",
+      linkedin: typeof candidate.socialLinks?.linkedin === "string" ? candidate.socialLinks.linkedin.trim() : "",
+      x: typeof candidate.socialLinks?.x === "string" ? candidate.socialLinks.x.trim() : "",
+    },
+    cvUrl: typeof candidate.cvUrl === "string" ? candidate.cvUrl.trim() : "",
     categories: categories.length ? categories : defaultGardenSettings.categories,
   };
 }

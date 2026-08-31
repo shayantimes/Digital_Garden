@@ -6,7 +6,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { gardenSettings } from "../lib/garden-config";
-import { CONTENT_EVENT, fetchGardenNow, fetchGardenPosts } from "../lib/garden-content";
+import { CONTENT_EVENT, fetchGardenNow, fetchGardenPosts, fetchGardenSettings } from "../lib/garden-content";
 import { starterNowItems, starterPosts } from "../lib/garden-data";
 import type { GardenCategory, GardenNowItem, GardenPost } from "../lib/garden-types";
 import styles from "./garden-home-content.module.css";
@@ -48,7 +48,7 @@ function nowSymbol(label: string) {
 function NowItemTitle({ item }: { item: GardenNowItem }) {
   const copy = <>{item.label ? <span className={styles.nowLabel}>{item.label}: </span> : null}{item.title}</>;
   if (!item.url) return <span className={styles.nowTitle}>{copy}</span>;
-  if (item.url.startsWith("/") && !item.url.startsWith("//")) return <Link href={item.url}>{copy}</Link>;
+  if (item.url.startsWith("/") && !item.url.startsWith("//")) return <Link className={styles.nowTitle} href={item.url}>{copy}</Link>;
   let isSafeExternalLink = false;
   try {
     const url = new URL(item.url);
@@ -56,11 +56,17 @@ function NowItemTitle({ item }: { item: GardenNowItem }) {
   } catch {
     // Invalid managed links render as plain text rather than unsafe anchors.
   }
-  if (isSafeExternalLink) return <a href={item.url} rel="noreferrer" target="_blank">{copy}</a>;
+  if (isSafeExternalLink) return <a className={styles.nowTitle} href={item.url} rel="noreferrer" target="_blank">{copy}</a>;
   return <span className={styles.nowTitle}>{copy}</span>;
 }
 
-function SocialIcon({ name }: { name: "cv" | "github" | "linkedin" | "instagram" | "x" }) {
+function PhotoCaption({ value }: { value: string }) {
+  const [lead, ...rest] = value.split(/\r?\n/);
+  return <>{lead ? <b>{lead}</b> : null}{rest.length ? <><br /><span className={styles.photoCaptionBody}>{rest.join("\n")}</span></> : null}</>;
+}
+
+function SocialIcon({ name }: { name: "cv" | "email" | "github" | "linkedin" | "instagram" | "x" }) {
+  if (name === "email") return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m4 7 8 6 8-6" /></svg>;
   if (name === "github") return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 0 0-3.16 19.49c.5.09.68-.22.68-.48v-1.87c-2.78.6-3.37-1.18-3.37-1.18-.45-1.16-1.11-1.47-1.11-1.47-.9-.62.07-.61.07-.61 1 .07 1.53 1.03 1.53 1.03.89 1.52 2.33 1.08 2.9.83.09-.64.35-1.08.63-1.33-2.22-.25-4.55-1.11-4.55-4.94 0-1.09.39-1.98 1.03-2.68-.1-.25-.45-1.27.1-2.64 0 0 .84-.27 2.75 1.02A9.6 9.6 0 0 1 12 6.84a9.6 9.6 0 0 1 2.5.34c1.91-1.29 2.75-1.02 2.75-1.02.55 1.37.2 2.39.1 2.64.64.7 1.03 1.59 1.03 2.68 0 3.84-2.34 4.68-4.57 4.93.36.31.68.92.68 1.85V21c0 .27.18.58.69.48A10 10 0 0 0 12 2Z" /></svg>;
   if (name === "linkedin") return <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.1 7.1A2.1 2.1 0 1 0 5.1 3a2.1 2.1 0 0 0 0 4.1ZM3.3 21h3.6V9H3.3v12ZM9.2 9h3.4v1.6h.05c.47-.9 1.64-1.9 3.37-1.9 3.6 0 4.27 2.37 4.27 5.46V21h-3.57v-6.06c0-1.45-.03-3.3-2.02-3.3-2.02 0-2.33 1.57-2.33 3.2V21H9.2V9Z" /></svg>;
   if (name === "instagram") return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="5" /><circle cx="12" cy="12" r="4" /><circle cx="17.5" cy="6.7" r="1" className={styles.iconFill} /></svg>;
@@ -72,13 +78,15 @@ function PaperPanel({
   section,
   category,
   posts,
+  recentCount,
 }: {
   section: GardenSection;
   category: GardenCategory;
   posts: GardenPost[];
+  recentCount: number;
 }) {
   const copy = sectionCopy[section];
-  const items = posts.length ? posts.slice(0, 3).map((post) => post.title) : fallbackItems[section];
+  const items = posts.length ? posts.slice(0, Math.min(3, recentCount)).map((post) => post.title) : fallbackItems[section].slice(0, Math.min(3, recentCount));
   return (
     <Link className={`${styles.paperPanel} ${styles[section]}`} href={`/${category.slug}`} aria-label={`Open ${category.label}`}>
       <span className={`${styles.tape} ${styles.panelTape}`} aria-hidden="true" />
@@ -107,12 +115,12 @@ export function GardenHomeContent() {
   const [posts, setPosts] = useState(() => starterPosts
     .filter((post) => post.status === "Published")
     .sort((a, b) => new Date(b.publishedAt || b.updatedAt).getTime() - new Date(a.publishedAt || a.updatedAt).getTime()));
-  const settings = gardenSettings;
+  const [settings, setSettings] = useState(gardenSettings);
   const [nowItems, setNowItems] = useState<GardenNowItem[]>(starterNowItems);
 
   useEffect(() => {
     const load = async () => {
-      const [postsResult, nowResult] = await Promise.allSettled([fetchGardenPosts(), fetchGardenNow()]);
+      const [postsResult, nowResult, settingsResult] = await Promise.allSettled([fetchGardenPosts(), fetchGardenNow(), fetchGardenSettings()]);
       if (postsResult.status === "fulfilled") {
         const managed = postsResult.value.posts
           .filter((post) => post.status === "Published")
@@ -120,6 +128,7 @@ export function GardenHomeContent() {
         setPosts(managed);
       }
       if (nowResult.status === "fulfilled") setNowItems(nowResult.value.items);
+      if (settingsResult.status === "fulfilled") setSettings(settingsResult.value.settings);
       // Keep bundled content visible when either content endpoint is temporarily unavailable.
     };
     void load();
@@ -140,10 +149,11 @@ export function GardenHomeContent() {
   const postsBySection = useMemo(() => {
     const result = {} as Record<GardenSection, GardenPost[]>;
     (["build", "notes", "shelf", "life"] as GardenSection[]).forEach((section) => {
-      result[section] = posts.filter((post) => post.category === layoutCategories[section].label);
+      const canonicalCategory = `${section.charAt(0).toUpperCase()}${section.slice(1)}`;
+      result[section] = posts.filter((post) => post.category === canonicalCategory);
     });
     return result;
-  }, [layoutCategories, posts]);
+  }, [posts]);
 
   return (
     <section className={styles.page} aria-labelledby="garden-title">
@@ -159,13 +169,14 @@ export function GardenHomeContent() {
         <div className={styles.desktopBody}>
           <aside className={styles.linksPanel}>
             <span className={`${styles.tape} ${styles.linkTape}`} aria-hidden="true" />
-            <header><h2>LINKS</h2><span>FIND ME / 05</span></header>
+            <header><h2>LINKS</h2><span>FIND ME / {[settings.cvUrl, settings.socialLinks.email, settings.socialLinks.github, settings.socialLinks.linkedin, settings.socialLinks.instagram, settings.socialLinks.x].filter(Boolean).length.toString().padStart(2, "0")}</span></header>
             <nav aria-label="Social links">
-              <a href="#cv"><SocialIcon name="cv" /><span>CV</span></a>
-              <a href="https://github.com" target="_blank" rel="noreferrer"><SocialIcon name="github" /><span>GitHub</span></a>
-              <a href="https://linkedin.com" target="_blank" rel="noreferrer"><SocialIcon name="linkedin" /><span>LinkedIn</span></a>
-              <a href="https://instagram.com" target="_blank" rel="noreferrer"><SocialIcon name="instagram" /><span>Instagram</span></a>
-              <a href="https://x.com" target="_blank" rel="noreferrer"><SocialIcon name="x" /><span>X</span></a>
+              {settings.cvUrl ? <a href={settings.cvUrl} target="_blank" rel="noreferrer"><SocialIcon name="cv" /><span>CV</span></a> : null}
+              {settings.socialLinks.email ? <a href={`mailto:${settings.socialLinks.email}`}><SocialIcon name="email" /><span>Email</span></a> : null}
+              {settings.socialLinks.github ? <a href={settings.socialLinks.github} target="_blank" rel="noreferrer"><SocialIcon name="github" /><span>GitHub</span></a> : null}
+              {settings.socialLinks.linkedin ? <a href={settings.socialLinks.linkedin} target="_blank" rel="noreferrer"><SocialIcon name="linkedin" /><span>LinkedIn</span></a> : null}
+              {settings.socialLinks.instagram ? <a href={settings.socialLinks.instagram} target="_blank" rel="noreferrer"><SocialIcon name="instagram" /><span>Instagram</span></a> : null}
+              {settings.socialLinks.x ? <a href={settings.socialLinks.x} target="_blank" rel="noreferrer"><SocialIcon name="x" /><span>X</span></a> : null}
             </nav>
             <PlantIcon className={styles.sprout} />
           </aside>
@@ -177,9 +188,9 @@ export function GardenHomeContent() {
               <div className={styles.aboutBody}>
                 <div className={styles.aboutCopy}>
                   <h3>{settings.headerName.toUpperCase()}</h3>
-                  <p className={styles.roles}>Marketer&nbsp; • &nbsp;Analyst&nbsp; • &nbsp;Builder</p>
-                  <strong>Digital Gardener</strong>
-                  <p className={styles.bio}>I explore, build, write,<br />and share things that shape<br />my mind and life.<br />This is my space to grow<br />in public.</p>
+                  <p className={styles.roles}>{settings.profileRoles}</p>
+                  <strong>{settings.profileTitle}</strong>
+                  <p className={styles.bio}>{settings.fieldNotes}</p>
                   <ul className={styles.facts}>
                     <li><span>⌖</span>Based in Earth</li>
                     <li><span>◷</span>GMT+3:30</li>
@@ -189,18 +200,18 @@ export function GardenHomeContent() {
                 <figure className={styles.polaroid}>
                   <span className={`${styles.tape} ${styles.photoTape}`} aria-hidden="true" />
                   <div className={`${styles.portraitCrop}${settings.profileImage ? ` ${styles.managedPortrait}` : ""}`} role="img" aria-label={`Portrait of ${settings.headerName}`}>{settings.profileImage ? <img src={settings.profileImage} alt="" /> : null}</div>
-                  <figcaption><b>Building a life</b><br />I don’t want to escape from.</figcaption>
+                  <figcaption><PhotoCaption value={settings.photoCaption} /></figcaption>
                   <PlantIcon className={styles.photoSprout} />
                 </figure>
               </div>
             </article>
 
             <div className={styles.cardGrid}>
-              <PaperPanel section="notes" category={layoutCategories.notes} posts={postsBySection.notes} />
-              <blockquote className={styles.quote}><span className={`${styles.tape} ${styles.quoteTape}`} aria-hidden="true" />“A garden is never<br />finished.<br />It just keeps<br />growing.” <PlantIcon className={styles.quotePlant} /></blockquote>
-              <PaperPanel section="build" category={layoutCategories.build} posts={postsBySection.build} />
-              <PaperPanel section="life" category={layoutCategories.life} posts={postsBySection.life} />
-              <PaperPanel section="shelf" category={layoutCategories.shelf} posts={postsBySection.shelf} />
+              <PaperPanel section="notes" category={layoutCategories.notes} posts={postsBySection.notes} recentCount={settings.recentCount} />
+              <blockquote className={styles.quote}><span className={`${styles.tape} ${styles.quoteTape}`} aria-hidden="true" />“<span className={styles.quoteText}>{settings.fieldNoteQuote}</span>” <PlantIcon className={styles.quotePlant} /></blockquote>
+              <PaperPanel section="build" category={layoutCategories.build} posts={postsBySection.build} recentCount={settings.recentCount} />
+              <PaperPanel section="life" category={layoutCategories.life} posts={postsBySection.life} recentCount={settings.recentCount} />
+              <PaperPanel section="shelf" category={layoutCategories.shelf} posts={postsBySection.shelf} recentCount={settings.recentCount} />
 
               <section className={styles.nowPanel}>
                 <span className={`${styles.tape} ${styles.nowTape}`} aria-hidden="true" />
@@ -213,7 +224,7 @@ export function GardenHomeContent() {
                 <PlantIcon className={styles.nowCornerPlant} />
               </section>
 
-              <section className={styles.promise}><span className={`${styles.tape} ${styles.promiseTape}`} aria-hidden="true" /><img className={styles.wateringCan} src="/garden-icon.png" alt="" /><p>I’m not here to be perfect.<br />I’m here to be honest and<br />keep planting.</p><PlantIcon className={styles.promiseCornerPlant} /></section>
+              <section className={styles.promise}><span className={`${styles.tape} ${styles.promiseTape}`} aria-hidden="true" /><img className={styles.wateringCan} src="/garden-icon.png" alt="" /><p>{settings.gardenPromise}</p><PlantIcon className={styles.promiseCornerPlant} /></section>
             </div>
           </main>
 

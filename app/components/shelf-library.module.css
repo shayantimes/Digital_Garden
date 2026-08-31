@@ -72,6 +72,7 @@
   rotate: 4deg;
 }
 .shelfDoodle::before { content: "FAVORITES"; position: absolute; top: 18px; left: 18px; font-size: 9px; font-weight: 900; letter-spacing: .16em; }
+.shelfDoodle > img { width: min(135px, 72%); max-height: 155px; align-self: center; object-fit: contain; }
 .shelfDoodle span { width: 35px; display: grid; place-items: center; border: 1.5px solid #292a25; border-bottom: 0; background: #f3ead9; font-size: 13px; font-weight: 900; }
 .shelfDoodle span:nth-child(1) { height: 135px; background: #f1d797; rotate: -3deg; }
 .shelfDoodle span:nth-child(2) { height: 118px; background: #e9b9a7; rotate: 1deg; }
@@ -176,4 +177,87 @@ a.card:hover .destination i { transform: translate(2px, -2px); }
 
 @media (prefers-reduced-motion: reduce) {
   .card, .tabs button, .cardTopline i, .destination i { transition: none; }
+}
+
+/* Homepage-aligned design-system bridge for the custom shelf experience. */
+.page {
+  --shelf-ink: var(--ds-ink, #293129);
+  --shelf-paper: var(--ds-paper, #f5eddf);
+  --shelf-canvas: var(--ds-canvas, #b8cdb9);
+  --shelf-accent: var(--ds-clay, #d8a28d);
+  --shelf-tape: var(--ds-tape, rgba(201, 166, 111, .7));
+  min-height: 75vh;
+  padding: 38px 32px 92px;
+  color: var(--shelf-ink);
+  font-family: var(--ds-font-ui, "Courier New", Courier, monospace);
+  background:
+    radial-gradient(rgba(43, 58, 44, .14) .55px, transparent .68px),
+    linear-gradient(115deg, rgba(255,255,255,.19), transparent 52%),
+    var(--shelf-canvas);
+  background-size: 6px 6px, auto, auto;
+}
+
+.hero {
+  width: min(100%, 1000px);
+  min-height: 390px;
+  grid-template-columns: minmax(0, 1fr) 250px;
+  gap: 58px;
+  margin-bottom: 46px;
+  padding: 60px 64px;
+  border: 1.35px solid var(--shelf-ink);
+  border-radius: 7px;
+  background:
+    radial-gradient(rgba(35, 35, 30, .07) .5px, transparent .55px),
+    var(--shelf-paper);
+  background-size: 6px 6px;
+  box-shadow: 5px 7px 0 rgba(42, 52, 43, .13);
+  rotate: -.2deg;
+}
+
+.hero::before,
+.card::before { background-color: var(--shelf-tape); }
+.hero h1 { font-family: var(--ds-font-ui, "Courier New", Courier, monospace); font-size: clamp(4.2rem, 8vw, 7.2rem); }
+.hero h1 em { color: #754a3a; }
+.hero h1 em::after { border-color: #c57f63; }
+.heroCopy > p:last-child { color: #475048; font-family: var(--ds-font-reading, Georgia, serif); font-weight: 400; }
+.eyebrow span { background: var(--shelf-accent); }
+
+.shelfDoodle {
+  min-height: 210px;
+  border: 1.35px solid var(--shelf-ink);
+  background: var(--shelf-accent);
+  box-shadow: 5px 7px 0 rgba(42, 52, 43, .13);
+  rotate: 3deg;
+}
+
+.library { width: min(100%, 1000px); }
+.libraryHeader { border-bottom: 1px solid rgba(59, 70, 61, .48); }
+.libraryHeader h2 { font-family: var(--ds-font-ui, "Courier New", Courier, monospace); }
+.tabs { gap: 7px; }
+.tabs button { border: 1px solid rgba(59, 70, 61, .72); border-radius: 4px; box-shadow: 2px 3px 0 rgba(42, 52, 43, .1); }
+.tabs button:nth-child(1) { background: var(--ds-stone, #c5c1b6); }
+.tabs button:nth-child(2) { background: var(--ds-ochre, #e5c77f); }
+.tabs button:nth-child(3) { background: var(--ds-clay, #d8a28d); }
+.tabs button:nth-child(4) { background: var(--ds-leaf, #b9c6a1); }
+.tabs button:nth-child(5) { background: var(--ds-lilac, #c9c0d2); }
+.tabs button.tabActive { background: var(--shelf-paper); outline: 2px dashed var(--shelf-ink); outline-offset: 2px; transform: translateY(-1px); }
+
+.card {
+  border: 1.35px solid var(--shelf-ink);
+  border-radius: 6px;
+  background:
+    radial-gradient(rgba(42, 42, 35, .07) .5px, transparent .55px),
+    var(--shelf-paper);
+  background-size: 6px 6px;
+  box-shadow: 5px 7px 0 rgba(42, 52, 43, .13);
+}
+
+a.card:hover { box-shadow: 8px 10px 0 rgba(42, 52, 43, .17); transform: translate(-2px, -3px); }
+.cardCopy strong { font-family: var(--ds-font-ui, "Courier New", Courier, monospace); }
+.creator { color: var(--ds-ink-muted, #556057); font-family: var(--ds-font-reading, Georgia, serif); font-weight: 400; }
+.empty { border-color: rgba(59, 70, 61, .75); background: rgba(245, 237, 223, .7); }
+
+@media (max-width: 680px) {
+  .page { padding: 26px 14px 64px; }
+  .hero { padding: 49px 28px 34px; }
 }

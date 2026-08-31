@@ -18,6 +18,42 @@ const optionalNowUrl = z.string().max(2_000).refine((value) => {
   try { return ["https:", "http:"].includes(new URL(value).protocol); } catch { return false; }
 }, "Use a garden path or a valid HTTP or HTTPS URL.");
 
+const optionalEmail = z.union([z.literal(""), z.email("Enter a valid email address.")]);
+
+export const gardenSettingsSchema = z.object({
+  headerName: z.string().trim().min(1).max(80),
+  profileImage: optionalAssetUrl.default(""),
+  recentCount: z.number().int().min(1).max(30).default(10),
+  fieldNotes: z.string().trim().max(1_200).default(""),
+  profileRoles: z.string().trim().max(180).default("Marketer • Analyst • Builder"),
+  profileTitle: z.string().trim().max(100).default("Digital Gardener"),
+  photoCaption: z.string().trim().max(280).default("Building a life\nI don’t want to escape from."),
+  fieldNoteQuote: z.string().trim().max(400).default("A garden is never\nfinished.\nIt just keeps\ngrowing."),
+  gardenPromise: z.string().trim().max(400).default("I’m not here to be perfect.\nI’m here to be honest and\nkeep planting."),
+  socialLinks: z.object({
+    email: optionalEmail.default(""),
+    github: optionalExternalUrl.default(""),
+    instagram: optionalExternalUrl.default(""),
+    linkedin: optionalExternalUrl.default(""),
+    x: optionalExternalUrl.default(""),
+  }),
+  cvUrl: z.string().max(2_000).refine((value) => !value || value.startsWith("/uploads/") || (() => {
+    try { return new URL(value).protocol === "https:"; } catch { return false; }
+  })(), "Use an uploaded CV or an HTTPS URL.").default(""),
+  categories: z.array(z.object({
+    id: z.enum(["category-build", "category-notes", "category-shelf", "category-life"]),
+    label: z.string().trim().min(1).max(40),
+    slug: z.string().trim().min(1).max(60).regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/),
+    iconImage: optionalAssetUrl.default(""),
+  })).length(4),
+});
+
+export const gardenAccountSchema = z.object({
+  username: z.string().trim().min(3).max(64).regex(/^[a-zA-Z0-9._-]+$/, "Use letters, numbers, dots, dashes, or underscores."),
+  email: z.email("Enter a valid email address.").trim(),
+  userId: z.union([z.literal(""), z.uuid("Use a valid Supabase user ID.")]).default(""),
+});
+
 export const gardenNowItemSchema = z.object({
   id: z.string().min(5).max(100).regex(/^now-[a-zA-Z0-9-]+$/),
   label: z.string().trim().max(50).default(""),
